@@ -759,6 +759,10 @@ bar, and on macOS, you can visit it from dock menu.
 
 Clears the recent documents list.
 
+### `app.getRecentDocuments()`_macOS_ _Windows_
+
+Returns `string[]` - An array containing documents in the most recent documents list.
+
 ### `app.setAsDefaultProtocolClient(protocol[, path, args])`
 
 * `protocol` string - The name of your protocol, without `://`. For example,

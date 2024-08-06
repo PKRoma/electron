@@ -162,17 +162,26 @@ void Browser::Show() {
 }
 
 void Browser::AddRecentDocument(const base::FilePath& path) {
-  NSString* path_string = base::apple::FilePathToNSString(path);
-  if (!path_string)
+  NSURL* ns_url = base::apple::FilePathToNSURL(path);
+  if (!ns_url)
     return;
-  NSURL* u = [NSURL fileURLWithPath:path_string];
-  if (!u)
-    return;
-  [[NSDocumentController sharedDocumentController] noteNewRecentDocumentURL:u];
+
+  [[NSDocumentController sharedDocumentController]
+      noteNewRecentDocumentURL:ns_url];
 }
 
 void Browser::ClearRecentDocuments() {
   [[NSDocumentController sharedDocumentController] clearRecentDocuments:nil];
+}
+
+std::vector<std::string> Browser::GetRecentDocuments() {
+  NSArray<NSURL*>* recentURLs =
+      [[NSDocumentController sharedDocumentController] recentDocumentURLs];
+  std::vector<std::string> documents;
+  documents.reserve([recentURLs count]);
+  for (NSURL* url in recentURLs)
+    documents.push_back(std::string([url.path UTF8String]));
+  return documents;
 }
 
 bool Browser::RemoveAsDefaultProtocolClient(const std::string& protocol,

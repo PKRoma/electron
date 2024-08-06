@@ -330,6 +330,30 @@ void Browser::ClearRecentDocuments() {
   SHAddToRecentDocs(SHARD_APPIDINFO, nullptr);
 }
 
+std::vector<std::string> Browser::GetRecentDocuments() {
+  std::vector<std::string> docs;
+
+  PWSTR recent_path_ptr = nullptr;
+  HRESULT hr =
+      SHGetKnownFolderPath(FOLDERID_Recent, 0, nullptr, &recent_path_ptr);
+  if (SUCCEEDED(hr) && recent_path_ptr) {
+    base::FilePath recent_folder(recent_path_ptr);
+    CoTaskMemFree(recent_path_ptr);
+
+    // Enumerate *.lnk files in the Recent folder.
+    base::FileEnumerator enumerator(recent_folder, /*recursive=*/false,
+                                    base::FileEnumerator::FILES,
+                                    FILE_PATH_LITERAL("*.lnk"));
+
+    for (base::FilePath file = enumerator.Next(); !file.empty();
+         file = enumerator.Next()) {
+      docs.push_back(file.MaybeAsASCII());
+    }
+  }
+
+  return docs;
+}
+
 void Browser::SetAppUserModelID(const std::wstring& name) {
   electron::SetAppUserModelID(name);
 }
