@@ -15,6 +15,7 @@ import * as path from 'node:path';
 import { setTimeout } from 'node:timers/promises';
 import * as url from 'node:url';
 
+import { ScreenCapture } from './lib/screen-helpers';
 import { ifit, ifdescribe, defer, itremote, listen, startRemoteControlApp, waitUntil } from './lib/spec-helpers';
 import { closeAllWindows } from './lib/window-helpers';
 import { PipeTransport } from './pipe-transport';
@@ -655,7 +656,10 @@ describe('chromium features', () => {
 
     // TODO: Re-enable for windows on GitHub Actions,
     // fullscreen tests seem to hang on GHA specifically
-    ifit(process.platform !== 'win32' || process.arch === 'arm64')('should lock the keyboard', async () => {
+    it('should lock the keyboard', async () => {
+      const screenCapture = new ScreenCapture();
+      console.log('In should lock the keyboard, about to take screenshot');
+      await screenCapture.takeScreenShot();
       const w = new BrowserWindow({ show: true });
       await w.loadFile(path.join(fixturesPath, 'pages', 'modal.html'));
 
@@ -2982,7 +2986,10 @@ describe('iframe using HTML fullscreen API while window is OS-fullscreened', () 
 
   // TODO: Re-enable for windows on GitHub Actions,
   // fullscreen tests seem to hang on GHA specifically
-  ifit(process.platform !== 'darwin' && (process.platform !== 'win32' || process.arch === 'arm64'))('can fullscreen from out-of-process iframes (non-macOS)', async () => {
+  ifit(process.platform !== 'darwin')('can fullscreen from out-of-process iframes (non-macOS)', async () => {
+    const screenCapture = new ScreenCapture();
+    console.log('In can fullscreen from out-of-process iframes (non-macOS, about to take screenshot');
+    await screenCapture.takeScreenShot();
     const fullscreenChange = once(ipcMain, 'fullscreenChange');
     const html =
       `<iframe style="width: 0" frameborder=0 src="${crossSiteUrl}" allowfullscreen></iframe>`;
@@ -3037,7 +3044,11 @@ describe('iframe using HTML fullscreen API while window is OS-fullscreened', () 
 
   // TODO: Re-enable for windows on GitHub Actions,
   // fullscreen tests seem to hang on GHA specifically
-  ifit(process.platform !== 'win32' || process.arch === 'arm64')('can fullscreen from in-process iframes', async () => {
+  it('can fullscreen from in-process iframes', async () => {
+    const screenCapture = new ScreenCapture();
+    console.log('In can fullscreen from in-process iframes');
+    await screenCapture.takeScreenShot();
+
     if (process.platform === 'darwin') await once(w, 'enter-full-screen');
 
     const fullscreenChange = once(ipcMain, 'fullscreenChange');

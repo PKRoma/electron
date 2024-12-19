@@ -122,6 +122,16 @@ export class ScreenCapture {
     return this._expectImpl(findPoint(this.display.size), hexColor, true);
   }
 
+  public async takeScreenShot () {
+    const frame = await this.captureFrame();
+    // Save the image as an artifact for better debugging
+    const artifactName = await createArtifactWithRandomId(
+      (id) => `color-mismatch-${id}.png`,
+      frame.toPNG()
+    );
+    console.log(`Created artifact at: ${artifactName}`);
+  }
+
   private async captureFrame (): Promise<NativeImage> {
     const sources = await desktopCapturer.getSources({
       types: ['screen'],
