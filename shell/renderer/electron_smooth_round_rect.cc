@@ -5,29 +5,25 @@
 #include "electron/shell/renderer/electron_smooth_round_rect.h"
 
 #include <numbers>
-#include "base/check_op.h"
+#include "base/check.h"
 
 namespace electron {
 
 namespace {
 
-// Applies quarter rotations (n * 90°) to a point relative to the origin.
 constexpr SkPoint QuarterRotate(const SkPoint& p,
                                 unsigned int quarter_rotations) {
-  // 0 = +X +Y
-  // 1 = -Y +X
-  // 2 = -X -Y
-  // 3 = +Y -X
-
-  float sign_x = (quarter_rotations + 1) % 4 < 2 ? 1.0f : -1.0f;
-  float sign_y = quarter_rotations % 4 < 2 ? 1.0f : -1.0f;
-
-  bool is_even_rotation = quarter_rotations % 2 == 0;
-
-  float value_x = is_even_rotation ? p.x() : p.y();
-  float value_y = is_even_rotation ? p.y() : p.x();
-
-  return SkPoint::Make(sign_x * value_x, sign_y * value_y);
+  switch (quarter_rotations % 4) {
+    case 0:
+      return p;
+    case 1:
+      return {-p.y(), p.x()};
+    case 2:
+      return {-p.x(), -p.y()};
+    // case 3:
+    default:
+      return {p.y(), -p.x()};
+  }
 }
 
 // Geometric measurements for constructing the curves of smooth round corners on
@@ -59,10 +55,13 @@ struct CurveGeometry {
 
   // The point where the edge connects to the curve.
   float edge_connecting_offset;
+
   // The control point for the curvature where the edge connects to the curve.
   float edge_curve_offset;
+
   // The control point for the curvature where the arc connects to the curve.
   float arc_curve_offset;
+
   // The point where the arc connects to the curve.
   SkVector arc_connecting_vector;
 };
@@ -140,8 +139,6 @@ void DrawCorner(SkPath& path,
 
 }  // namespace
 
-// ASSUMPTIONS:
-// - Size (width, height) fits full radius + extended rounding
 SkPath DrawSmoothRoundRect(float x,
                            float y,
                            float width,
@@ -151,17 +148,18 @@ SkPath DrawSmoothRoundRect(float x,
                            float top_right_radius,
                            float bottom_right_radius,
                            float bottom_left_radius) {
-  DCHECK_GT(width, 0.0f);
-  DCHECK_GT(height, 0.0f);
-  DCHECK_GT(smoothness,
-            0.0f);  // smoothness == 0 should call an optimized procedure
-  DCHECK_LE(smoothness, 1.0f);
-  DCHECK_GT(top_left_radius, 0.0f);
-  DCHECK_GT(top_right_radius, 0.0f);
-  DCHECK_GT(bottom_right_radius, 0.0f);
-  DCHECK_GT(bottom_left_radius, 0.0f);
+  if (width <= 0.0f || height <= 0.0f) {
+    return SkPath();
+  }
 
-  // TODO: balance overlaping radii and smoothing curves
+  // We assume the radii are already constrained within the rectangle size
+  DCHECK(top_left_radius + top_right_radius <= width);
+  DCHECK(bottom_left_radius + bottom_right_radius <= width);
+  DCHECK(top_left_radius + bottom_left_radius <= height);
+  DCHECK(top_right_radius + bottom_right_radius <= height);
+
+  // Constrain each corner curve's smoothness
+  // TODO
 
   SkPath path;
 

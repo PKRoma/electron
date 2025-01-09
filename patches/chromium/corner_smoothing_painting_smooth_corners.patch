@@ -5,6 +5,73 @@ Subject: [Corner Smoothing] Painting smooth corners
 
 TODO: merge all patches together
 
+diff --git a/third_party/blink/renderer/core/css/css_properties.json5 b/third_party/blink/renderer/core/css/css_properties.json5
+index 2682380c81d6343c70899b77371431d411e612ab..0ef52d0bcf9ec019607b1ddd5d99d6ae1ce2f83c 100644
+--- a/third_party/blink/renderer/core/css/css_properties.json5
++++ b/third_party/blink/renderer/core/css/css_properties.json5
+@@ -8793,13 +8793,12 @@
+       property_methods: ["ParseSingleValue"],
+       converter: "ConvertNumberOrPercentage",
+       field_group: "*",
+-      // TODO: only percentage
+       field_template: "primitive",
+       type_name: "float",
+       default_value: "0",
+       typedom_types: ["Percentage"],
+       is_border_radius: true,
+-      invalidate: ["paint"],
++      invalidate: ["paint", "border-radius", "clip"],
+     },
+     // Aliases; these map to the same CSSPropertyID
+     {
+diff --git a/third_party/blink/renderer/core/paint/box_border_painter.cc b/third_party/blink/renderer/core/paint/box_border_painter.cc
+index 6eb5ad4ddd265c379efde17a0c3a2f954e0d4d82..6534eaecc914f84b5bab6941e487d99cf12c19e5 100644
+--- a/third_party/blink/renderer/core/paint/box_border_painter.cc
++++ b/third_party/blink/renderer/core/paint/box_border_painter.cc
+@@ -245,7 +245,7 @@ FloatRoundedRect CalculateAdjustedInnerBorder(
+       break;
+   }
+ 
+-  return FloatRoundedRect(new_rect, new_radii);
++  return FloatRoundedRect(new_rect, new_radii, inner_border.Smoothness());
+ }
+ 
+ void DrawSolidBorderRect(GraphicsContext& context,
+@@ -281,7 +281,11 @@ void DrawBleedAdjustedDRRect(GraphicsContext& context,
+       // *outside* of inner rrect, all the way to the layer bounds (enclosing
+       // int rect for the clip, in device space).
+       SkPath path;
+-      path.addRRect(SkRRect(inner));
++      if (inner.IsSmooth()) {
++        path.addPath(inner.SmoothPath());
++      } else {
++        path.addRRect(SkRRect(inner));
++      }
+       path.setFillType(SkPathFillType::kInverseWinding);
+ 
+       cc::PaintFlags flags;
+diff --git a/third_party/blink/renderer/core/paint/box_painter_base.cc b/third_party/blink/renderer/core/paint/box_painter_base.cc
+index cf237c40ecda5b8e14a0785e650a6c0d30fae4df..a7dbe53647f7243da10ca5e472590bfc0108bec4 100644
+--- a/third_party/blink/renderer/core/paint/box_painter_base.cc
++++ b/third_party/blink/renderer/core/paint/box_painter_base.cc
+@@ -295,7 +295,7 @@ void BoxPainterBase::PaintNormalBoxShadow(const PaintInfo& info,
+     context.SetDrawLooper(draw_looper_builder.DetachDrawLooper());
+ 
+     if (has_border_radius) {
+-      FloatRoundedRect rounded_fill_rect(fill_rect, border.GetRadii());
++      FloatRoundedRect rounded_fill_rect(fill_rect, border.GetRadii(), border.Smoothness());
+       ApplySpreadToShadowShape(rounded_fill_rect, shadow.Spread());
+       context.FillRoundedRect(
+           rounded_fill_rect, Color::kBlack,
+@@ -379,7 +379,7 @@ void BoxPainterBase::PaintInsetBoxShadow(const PaintInfo& info,
+ 
+     gfx::RectF inner_rect = bounds.Rect();
+     AdjustRectForSideClipping(inner_rect, shadow, sides_to_include);
+-    FloatRoundedRect inner_rounded_rect(inner_rect, bounds.GetRadii());
++    FloatRoundedRect inner_rounded_rect(inner_rect, bounds.GetRadii(), bounds.Smoothness());
+     ApplySpreadToShadowShape(inner_rounded_rect, -shadow.Spread());
+     if (inner_rounded_rect.IsEmpty()) {
+       // |AutoDarkMode::Disabled()| is used because |shadow_color| has already
 diff --git a/third_party/blink/renderer/core/paint/rounded_border_geometry.cc b/third_party/blink/renderer/core/paint/rounded_border_geometry.cc
 index 1641321846aeaca69df21125141c722f76b27ebc..84137b7bdd7b4edb0ddf854887e945e1694b23d5 100644
 --- a/third_party/blink/renderer/core/paint/rounded_border_geometry.cc
@@ -41,8 +108,67 @@ index 1641321846aeaca69df21125141c722f76b27ebc..84137b7bdd7b4edb0ddf854887e945e1
    }
    return rounded_rect;
  }
+diff --git a/third_party/blink/renderer/core/paint/rounded_inner_rect_clipper.cc b/third_party/blink/renderer/core/paint/rounded_inner_rect_clipper.cc
+index f9f0cc13c043e4653d8a616d0ef4f2f776aace74..d4dd4351b763814d86c8e4828cf42204ba0b828d 100644
+--- a/third_party/blink/renderer/core/paint/rounded_inner_rect_clipper.cc
++++ b/third_party/blink/renderer/core/paint/rounded_inner_rect_clipper.cc
+@@ -28,16 +28,16 @@ RoundedInnerRectClipper::RoundedInnerRectClipper(
+                             rect.Bottom() - clip_rect.Rect().y());
+       FloatRoundedRect::Radii top_corner_radii;
+       top_corner_radii.SetTopLeft(clip_rect.GetRadii().TopLeft());
+-      rounded_rect_clips.push_back(
+-          FloatRoundedRect(top_corner, top_corner_radii));
++      rounded_rect_clips.push_back(FloatRoundedRect(
++          top_corner, top_corner_radii, clip_rect.Smoothness()));
+ 
+       gfx::RectF bottom_corner(rect.X().ToFloat(), rect.Y().ToFloat(),
+                                clip_rect.Rect().right() - rect.X().ToFloat(),
+                                clip_rect.Rect().bottom() - rect.Y().ToFloat());
+       FloatRoundedRect::Radii bottom_corner_radii;
+       bottom_corner_radii.SetBottomRight(clip_rect.GetRadii().BottomRight());
+-      rounded_rect_clips.push_back(
+-          FloatRoundedRect(bottom_corner, bottom_corner_radii));
++      rounded_rect_clips.push_back(FloatRoundedRect(
++          bottom_corner, bottom_corner_radii, clip_rect.Smoothness()));
+     }
+ 
+     if (!clip_rect.GetRadii().TopRight().IsEmpty() ||
+@@ -47,16 +47,16 @@ RoundedInnerRectClipper::RoundedInnerRectClipper(
+                             rect.Bottom() - clip_rect.Rect().y());
+       FloatRoundedRect::Radii top_corner_radii;
+       top_corner_radii.SetTopRight(clip_rect.GetRadii().TopRight());
+-      rounded_rect_clips.push_back(
+-          FloatRoundedRect(top_corner, top_corner_radii));
++      rounded_rect_clips.push_back(FloatRoundedRect(
++          top_corner, top_corner_radii, clip_rect.Smoothness()));
+ 
+       gfx::RectF bottom_corner(clip_rect.Rect().x(), rect.Y().ToFloat(),
+                                rect.Right() - clip_rect.Rect().x(),
+                                clip_rect.Rect().bottom() - rect.Y().ToFloat());
+       FloatRoundedRect::Radii bottom_corner_radii;
+       bottom_corner_radii.SetBottomLeft(clip_rect.GetRadii().BottomLeft());
+-      rounded_rect_clips.push_back(
+-          FloatRoundedRect(bottom_corner, bottom_corner_radii));
++      rounded_rect_clips.push_back(FloatRoundedRect(
++          bottom_corner, bottom_corner_radii, clip_rect.Smoothness()));
+     }
+   }
+ 
+diff --git a/third_party/blink/renderer/platform/BUILD.gn b/third_party/blink/renderer/platform/BUILD.gn
+index d206b245cb3690ac7abc8b11819f04bba49a1361..e8162cc7ed70b87f033ef2077bd77e9e13eec1e7 100644
+--- a/third_party/blink/renderer/platform/BUILD.gn
++++ b/third_party/blink/renderer/platform/BUILD.gn
+@@ -1626,6 +1626,8 @@ component("platform") {
+     "widget/widget_base.h",
+     "widget/widget_base_client.h",
+     "windows_keyboard_codes.h",
++    "//electron/shell/renderer/electron_smooth_round_rect.h",
++    "//electron/shell/renderer/electron_smooth_round_rect.cc",
+   ]
+ 
+   sources -= blink_platform_avx_files
 diff --git a/third_party/blink/renderer/platform/geometry/float_rounded_rect.h b/third_party/blink/renderer/platform/geometry/float_rounded_rect.h
-index 95d4498a0e0b3484ecbf9fe50f5aef49a68b5dcb..70c32c806e3454175e4433e8072b3aee10bb0c25 100644
+index 95d4498a0e0b3484ecbf9fe50f5aef49a68b5dcb..28a2be975a115ec16137337e6e955101342e739f 100644
 --- a/third_party/blink/renderer/platform/geometry/float_rounded_rect.h
 +++ b/third_party/blink/renderer/platform/geometry/float_rounded_rect.h
 @@ -34,6 +34,7 @@
@@ -53,7 +179,12 @@ index 95d4498a0e0b3484ecbf9fe50f5aef49a68b5dcb..70c32c806e3454175e4433e8072b3aee
  #include "third_party/blink/renderer/platform/platform_export.h"
  #include "third_party/blink/renderer/platform/wtf/allocator/allocator.h"
  #include "third_party/blink/renderer/platform/wtf/text/wtf_string.h"
-@@ -135,11 +136,14 @@ class PLATFORM_EXPORT FloatRoundedRect {
+@@ -132,14 +133,19 @@ class PLATFORM_EXPORT FloatRoundedRect {
+       : rect_(rect), radii_(radius) {}
+   FloatRoundedRect(const gfx::RectF& r, float radius_x, float radius_y)
+       : FloatRoundedRect(r, Radii(radius_x, radius_y)) {}
++  FloatRoundedRect(const gfx::RectF& r, const Radii& radii, float smoothness)
++      : rect_(r), radii_(radii), smoothness_(smoothness) {}
  
    constexpr const gfx::RectF& Rect() const { return rect_; }
    constexpr const Radii& GetRadii() const { return radii_; }
@@ -68,7 +199,7 @@ index 95d4498a0e0b3484ecbf9fe50f5aef49a68b5dcb..70c32c806e3454175e4433e8072b3aee
  
    void Move(const gfx::Vector2dF& offset) { rect_.Offset(offset); }
  
-@@ -214,6 +218,13 @@ class PLATFORM_EXPORT FloatRoundedRect {
+@@ -214,6 +220,13 @@ class PLATFORM_EXPORT FloatRoundedRect {
    // the rounded border.
    void ConstrainRadii();
  
@@ -82,7 +213,7 @@ index 95d4498a0e0b3484ecbf9fe50f5aef49a68b5dcb..70c32c806e3454175e4433e8072b3aee
    explicit operator SkRRect() const;
    explicit operator gfx::RRectF() const { return gfx::RRectF(SkRRect(*this)); }
  
-@@ -222,6 +233,7 @@ class PLATFORM_EXPORT FloatRoundedRect {
+@@ -222,9 +235,13 @@ class PLATFORM_EXPORT FloatRoundedRect {
   private:
    gfx::RectF rect_;
    Radii radii_;
@@ -90,50 +221,182 @@ index 95d4498a0e0b3484ecbf9fe50f5aef49a68b5dcb..70c32c806e3454175e4433e8072b3aee
  };
  
  inline FloatRoundedRect::operator SkRRect() const {
++  DCHECK(!IsSmooth()) << "This smooth rounded rect should be converted to an "
++                         "SkPath using SmoothPath() instead";
++
+   SkRRect rrect;
+ 
+   if (IsRounded()) {
+@@ -259,7 +276,8 @@ constexpr bool operator!=(const FloatRoundedRect::Radii& a,
+ 
+ constexpr bool operator==(const FloatRoundedRect& a,
+                           const FloatRoundedRect& b) {
+-  return a.Rect() == b.Rect() && a.GetRadii() == b.GetRadii();
++  return a.Rect() == b.Rect() && a.GetRadii() == b.GetRadii() &&
++         a.Smoothness() == b.Smoothness();
+ }
+ 
+ constexpr bool operator!=(const FloatRoundedRect& a,
+diff --git a/third_party/blink/renderer/platform/graphics/compositing/paint_artifact_compositor.cc b/third_party/blink/renderer/platform/graphics/compositing/paint_artifact_compositor.cc
+index b6895c1bdcc949c76c160c3dcd1ffd9af18e182a..ad131c51b556abcfccd89e21cf8c520fcf9ceb2a 100644
+--- a/third_party/blink/renderer/platform/graphics/compositing/paint_artifact_compositor.cc
++++ b/third_party/blink/renderer/platform/graphics/compositing/paint_artifact_compositor.cc
+@@ -783,7 +783,7 @@ void SynthesizedClip::UpdateLayer(const ClipPaintPropertyNode& clip,
+   CHECK_EQ(layer_->client(), this);
+ 
+   const auto& path = clip.ClipPath();
+-  SkRRect new_rrect(clip.PaintClipRect());
++  FloatRoundedRect new_rrect = clip.PaintClipRect();
+   gfx::Rect layer_rect = gfx::ToEnclosingRect(clip.PaintClipRect().Rect());
+   bool needs_display = false;
+ 
+@@ -797,7 +797,7 @@ void SynthesizedClip::UpdateLayer(const ClipPaintPropertyNode& clip,
+ 
+   if (!path && new_projection.IsIdentityOr2dTranslation()) {
+     gfx::Vector2dF translation = new_projection.To2dTranslation();
+-    new_rrect.offset(translation.x(), translation.y());
++    new_rrect.Move(gfx::Vector2dF(translation.x(), translation.y()));
+     needs_display = !rrect_is_local_ || new_rrect != rrect_;
+     projection_.MakeIdentity();
+     rrect_is_local_ = true;
+@@ -825,7 +825,11 @@ SynthesizedClip::PaintContentsToDisplayList() {
+   flags.setAntiAlias(true);
+   cc_list->StartPaint();
+   if (rrect_is_local_) {
+-    cc_list->push<cc::DrawRRectOp>(rrect_, flags);
++    if (rrect_.IsSmooth()) {
++      cc_list->push<cc::DrawPathOp>(rrect_.SmoothPath(), flags);
++    } else {
++      cc_list->push<cc::DrawRRectOp>(SkRRect(rrect_), flags);
++    }
+   } else {
+     cc_list->push<cc::SaveOp>();
+     if (projection_.IsIdentityOr2dTranslation()) {
+@@ -838,7 +842,11 @@ SynthesizedClip::PaintContentsToDisplayList() {
+       cc_list->push<cc::ClipPathOp>(path_->GetSkPath(), SkClipOp::kIntersect,
+                                     true);
+     }
+-    cc_list->push<cc::DrawRRectOp>(rrect_, flags);
++    if (rrect_.IsSmooth()) {
++      cc_list->push<cc::DrawPathOp>(rrect_.SmoothPath(), flags);
++    } else {
++      cc_list->push<cc::DrawRRectOp>(SkRRect(rrect_), flags);
++    }
+     cc_list->push<cc::RestoreOp>();
+   }
+   cc_list->EndPaintOfUnpaired(gfx::Rect(layer_->bounds()));
+diff --git a/third_party/blink/renderer/platform/graphics/compositing/paint_artifact_compositor.h b/third_party/blink/renderer/platform/graphics/compositing/paint_artifact_compositor.h
+index fb3919ca9e049ba1f1f15bdf295f9ae03d531ac8..85787a575404bc39b7ec28ee2237ce80328766e9 100644
+--- a/third_party/blink/renderer/platform/graphics/compositing/paint_artifact_compositor.h
++++ b/third_party/blink/renderer/platform/graphics/compositing/paint_artifact_compositor.h
+@@ -94,7 +94,7 @@ class SynthesizedClip : public cc::ContentLayerClient {
+   scoped_refptr<cc::PictureLayer> layer_;
+   gfx::Transform projection_;
+   bool rrect_is_local_ = false;
+-  SkRRect rrect_;
++  FloatRoundedRect rrect_;
+   std::optional<Path> path_;
+   CompositorElementId mask_isolation_id_;
+   CompositorElementId mask_effect_id_;
+diff --git a/third_party/blink/renderer/platform/graphics/compositing/paint_chunks_to_cc_layer.cc b/third_party/blink/renderer/platform/graphics/compositing/paint_chunks_to_cc_layer.cc
+index 4551b438ceb483bd9ad3e31fdc42c0d9cb689f92..0b60957d553fd3fdc9620409a97f34c5e307aace 100644
+--- a/third_party/blink/renderer/platform/graphics/compositing/paint_chunks_to_cc_layer.cc
++++ b/third_party/blink/renderer/platform/graphics/compositing/paint_chunks_to_cc_layer.cc
+@@ -551,8 +551,13 @@ ScrollTranslationAction ConversionContext<Result>::StartClip(
+     ApplyTransform(local_transform);
+     const bool antialias = true;
+     if (combined_clip_rect.IsRounded()) {
+-      push<cc::ClipRRectOp>(SkRRect(combined_clip_rect), SkClipOp::kIntersect,
+-                            antialias);
++      if (combined_clip_rect.IsSmooth()) {
++        push<cc::ClipPathOp>(combined_clip_rect.SmoothPath(),
++                             SkClipOp::kIntersect, antialias);
++      } else {
++        push<cc::ClipRRectOp>(SkRRect(combined_clip_rect), SkClipOp::kIntersect,
++                              antialias);
++      }
+     } else {
+       push<cc::ClipRectOp>(gfx::RectFToSkRect(combined_clip_rect.Rect()),
+                            SkClipOp::kIntersect, antialias);
 diff --git a/third_party/blink/renderer/platform/graphics/graphics_context.cc b/third_party/blink/renderer/platform/graphics/graphics_context.cc
-index 8503c0d22d68f63e0015bb76507dd22484d3a6d7..3cae5bfccdd2353ee92c3d94e4da68cbc7f52b19 100644
+index 8503c0d22d68f63e0015bb76507dd22484d3a6d7..135e30f7a2ef0c9cc635d97349f59b157399323f 100644
 --- a/third_party/blink/renderer/platform/graphics/graphics_context.cc
 +++ b/third_party/blink/renderer/platform/graphics/graphics_context.cc
-@@ -641,6 +641,7 @@ void GraphicsContext::DrawImageRRect(
-         image.ApplyShader(image_flags, local_matrix, src_rect, draw_options);
+@@ -648,11 +648,19 @@ void GraphicsContext::DrawImageRRect(
+     image_flags.setFilterQuality(
+         ComputeFilterQuality(image, dest.Rect(), src_rect));
+     // Shader-based fast path.
+-    canvas_->drawRRect(SkRRect(dest), image_flags);
++    if (dest.IsSmooth()) {
++      canvas_->drawPath(dest.SmoothPath(), image_flags);
++    } else {
++      canvas_->drawRRect(SkRRect(dest), image_flags);
++    }
+   } else {
+     // Clip-based fallback.
+     PaintCanvasAutoRestore auto_restore(canvas_, true);
+-    canvas_->clipRRect(SkRRect(dest), image_flags.isAntiAlias());
++    if (dest.IsSmooth()) {
++      canvas_->clipPath(dest.SmoothPath(), image_flags.isAntiAlias());
++    } else {
++      canvas_->clipRRect(SkRRect(dest), image_flags.isAntiAlias());
++    }
+     image.Draw(canvas_, image_flags, dest.Rect(), src_rect, draw_options);
    }
  
-+  // TODO: smooth rounding
-   if (use_shader) {
-     // Temporarily set filter-quality for the shader. <reed>
-     // Should be replaced with explicit sampling parameter passed to
-@@ -809,6 +810,14 @@ void GraphicsContext::FillRoundedRect(const FloatRoundedRect& rrect,
+@@ -809,15 +817,24 @@ void GraphicsContext::FillRoundedRect(const FloatRoundedRect& rrect,
  
    const cc::PaintFlags& fill_flags = ImmutableState()->FillFlags();
    const SkColor4f sk_color = color.toSkColor4f();
 +
+   if (sk_color == fill_flags.getColor4f()) {
+-    DrawRRect(SkRRect(rrect), fill_flags, auto_dark_mode);
++    if (rrect.IsSmooth()) {
++      DrawPath(rrect.SmoothPath(), fill_flags, auto_dark_mode);
++    } else {
++      DrawRRect(SkRRect(rrect), fill_flags, auto_dark_mode);
++    }
+     return;
+   }
+ 
+   cc::PaintFlags flags = fill_flags;
+   flags.setColor(sk_color);
+ 
+-  DrawRRect(SkRRect(rrect), flags, auto_dark_mode);
 +  if (rrect.IsSmooth()) {
-+    cc::PaintFlags flags = fill_flags;
-+    flags.setColor(sk_color);
 +    DrawPath(rrect.SmoothPath(), flags, auto_dark_mode);
++  } else {
++    DrawRRect(SkRRect(rrect), flags, auto_dark_mode);
++  }
+ }
+ 
+ namespace {
+@@ -869,6 +886,13 @@ void GraphicsContext::FillDRRect(const FloatRoundedRect& outer,
+                                  const AutoDarkMode& auto_dark_mode) {
+   DCHECK(canvas_);
+ 
++  if (outer.IsSmooth() || inner.IsSmooth()) {
++    PaintCanvasAutoRestore auto_restore(canvas_, true);
++    ClipOutRoundedRect(inner);
++    FillRoundedRect(outer, color, auto_dark_mode);
 +    return;
 +  }
 +
-   if (sk_color == fill_flags.getColor4f()) {
-     DrawRRect(SkRRect(rrect), fill_flags, auto_dark_mode);
-     return;
-@@ -872,6 +881,7 @@ void GraphicsContext::FillDRRect(const FloatRoundedRect& outer,
    const cc::PaintFlags& fill_flags = ImmutableState()->FillFlags();
    const SkColor4f sk_color = color.toSkColor4f();
    if (!IsSimpleDRRect(outer, inner)) {
-+    // TODO: smooth rounding
-     if (sk_color == fill_flags.getColor4f()) {
-       canvas_->drawDRRect(SkRRect(outer), SkRRect(inner),
-                           DarkModeFlags(this, auto_dark_mode, fill_flags));
-@@ -903,6 +913,7 @@ void GraphicsContext::FillRectWithRoundedHole(
+@@ -903,6 +927,10 @@ void GraphicsContext::FillRectWithRoundedHole(
      const FloatRoundedRect& rounded_hole_rect,
      const Color& color,
      const AutoDarkMode& auto_dark_mode) {
-+  // TODO: smooth rounding
++  if (rounded_hole_rect.IsSmooth()) {
++    FillDRRect(FloatRoundedRect(rect), rounded_hole_rect, color, auto_dark_mode);
++    return;
++  }
    cc::PaintFlags flags(ImmutableState()->FillFlags());
    flags.setColor(color.toSkColor4f());
    canvas_->drawDRRect(SkRRect::MakeRect(gfx::RectFToSkRect(rect)),
-@@ -951,6 +962,10 @@ void GraphicsContext::ClipRoundedRect(const FloatRoundedRect& rrect,
+@@ -951,6 +979,10 @@ void GraphicsContext::ClipRoundedRect(const FloatRoundedRect& rrect,
      ClipRect(gfx::RectFToSkRect(rrect.Rect()), should_antialias, clip_op);
      return;
    }
@@ -144,3 +407,18 @@ index 8503c0d22d68f63e0015bb76507dd22484d3a6d7..3cae5bfccdd2353ee92c3d94e4da68cb
  
    ClipRRect(SkRRect(rrect), should_antialias, clip_op);
  }
+diff --git a/third_party/blink/renderer/platform/graphics/path.cc b/third_party/blink/renderer/platform/graphics/path.cc
+index e97c0ca8e7e9d875ddb81dbcb5515db70d9d6222..b26020f3c65c4f7a9c7c40f17b533e8989e248c8 100644
+--- a/third_party/blink/renderer/platform/graphics/path.cc
++++ b/third_party/blink/renderer/platform/graphics/path.cc
+@@ -500,6 +500,10 @@ void Path::AddEllipse(const gfx::PointF& center,
+ void Path::AddRoundedRect(const FloatRoundedRect& rect, bool clockwise) {
+   if (rect.IsEmpty())
+     return;
++  if (rect.IsSmooth()) {
++    AddPath(rect.SmoothPath(), AffineTransform());
++    return;
++  }
+ 
+   path_.addRRect(SkRRect(rect),
+                  clockwise ? SkPathDirection::kCW : SkPathDirection::kCCW,
