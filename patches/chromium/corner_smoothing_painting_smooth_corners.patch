@@ -168,7 +168,7 @@ index d206b245cb3690ac7abc8b11819f04bba49a1361..e8162cc7ed70b87f033ef2077bd77e9e
  
    sources -= blink_platform_avx_files
 diff --git a/third_party/blink/renderer/platform/geometry/float_rounded_rect.h b/third_party/blink/renderer/platform/geometry/float_rounded_rect.h
-index 95d4498a0e0b3484ecbf9fe50f5aef49a68b5dcb..28a2be975a115ec16137337e6e955101342e739f 100644
+index 95d4498a0e0b3484ecbf9fe50f5aef49a68b5dcb..5e13aa1c0b21e659585018729a772e1d289a34c5 100644
 --- a/third_party/blink/renderer/platform/geometry/float_rounded_rect.h
 +++ b/third_party/blink/renderer/platform/geometry/float_rounded_rect.h
 @@ -34,6 +34,7 @@
@@ -199,21 +199,22 @@ index 95d4498a0e0b3484ecbf9fe50f5aef49a68b5dcb..28a2be975a115ec16137337e6e955101
  
    void Move(const gfx::Vector2dF& offset) { rect_.Offset(offset); }
  
-@@ -214,6 +220,13 @@ class PLATFORM_EXPORT FloatRoundedRect {
+@@ -214,6 +220,14 @@ class PLATFORM_EXPORT FloatRoundedRect {
    // the rounded border.
    void ConstrainRadii();
  
 +  SkPath SmoothPath() const {
 +    return electron::DrawSmoothRoundRect(
-+        rect_.x(), rect_.y(), rect_.width(), rect_.height(), smoothness_,
-+        radii_.TopLeft().width(), radii_.TopRight().width(),
-+        radii_.BottomRight().width(), radii_.BottomLeft().width());
++        rect_.x(), rect_.y(), rect_.width(), rect_.height(),
++        std::min(smoothness_, 1.0f), radii_.TopLeft().width(),
++        radii_.TopRight().width(), radii_.BottomRight().width(),
++        radii_.BottomLeft().width());
 +  }
 +
    explicit operator SkRRect() const;
    explicit operator gfx::RRectF() const { return gfx::RRectF(SkRRect(*this)); }
  
-@@ -222,9 +235,13 @@ class PLATFORM_EXPORT FloatRoundedRect {
+@@ -222,9 +236,13 @@ class PLATFORM_EXPORT FloatRoundedRect {
   private:
    gfx::RectF rect_;
    Radii radii_;
@@ -227,7 +228,7 @@ index 95d4498a0e0b3484ecbf9fe50f5aef49a68b5dcb..28a2be975a115ec16137337e6e955101
    SkRRect rrect;
  
    if (IsRounded()) {
-@@ -259,7 +276,8 @@ constexpr bool operator!=(const FloatRoundedRect::Radii& a,
+@@ -259,7 +277,8 @@ constexpr bool operator!=(const FloatRoundedRect::Radii& a,
  
  constexpr bool operator==(const FloatRoundedRect& a,
                            const FloatRoundedRect& b) {
@@ -318,6 +319,19 @@ index 4551b438ceb483bd9ad3e31fdc42c0d9cb689f92..0b60957d553fd3fdc9620409a97f34c5
      } else {
        push<cc::ClipRectOp>(gfx::RectFToSkRect(combined_clip_rect.Rect()),
                             SkClipOp::kIntersect, antialias);
+diff --git a/third_party/blink/renderer/platform/graphics/compositing/property_tree_manager.cc b/third_party/blink/renderer/platform/graphics/compositing/property_tree_manager.cc
+index f32bfeab409aaba843834fce4e63083c1b75f539..193dfb3b93cb97e9faf5d7eb69720997e8bd3b96 100644
+--- a/third_party/blink/renderer/platform/graphics/compositing/property_tree_manager.cc
++++ b/third_party/blink/renderer/platform/graphics/compositing/property_tree_manager.cc
+@@ -914,7 +914,7 @@ std::optional<gfx::RRectF> PropertyTreeManager::ShaderBasedRRect(
+   if (type & CcEffectType::kSyntheticFor2dAxisAlignment) {
+     return std::nullopt;
+   }
+-  if (clip.ClipPath()) {
++  if (clip.ClipPath() || clip.PaintClipRect().IsSmooth()) {
+     return std::nullopt;
+   }
+ 
 diff --git a/third_party/blink/renderer/platform/graphics/graphics_context.cc b/third_party/blink/renderer/platform/graphics/graphics_context.cc
 index 8503c0d22d68f63e0015bb76507dd22484d3a6d7..135e30f7a2ef0c9cc635d97349f59b157399323f 100644
 --- a/third_party/blink/renderer/platform/graphics/graphics_context.cc
