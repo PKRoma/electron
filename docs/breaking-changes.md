@@ -12,6 +12,15 @@ This document uses the following convention to categorize breaking changes:
 * **Deprecated:** An API was marked as deprecated. The API will continue to function, but will emit a deprecation warning, and will be removed in a future release.
 * **Removed:** An API or feature was removed, and is no longer supported by Electron.
 
+## Planned Breaking API Changes (36.0)
+
+### Deprecated: Extension methods and events on `session`
+
+`session.loadExtension`, `session.removeExtension`, `session.getExtension`,
+`session.getAllExtensions`, 'extension-loaded' event, 'extension-unloaded'
+event, and 'extension-ready' events have all moved to the new
+`session.extensions` class.
+
 ## Planned Breaking API Changes (35.0)
 
 ### Removed:`isDefault` and `status` properties on `PrinterInfo`
