@@ -34,6 +34,7 @@
 #include "services/network/public/cpp/shared_url_loader_factory.h"
 #include "services/network/public/mojom/network_context.mojom.h"
 #include "services/network/public/mojom/url_response_head.mojom.h"
+#include "shell/browser/api/electron_api_app.h"
 #include "shell/browser/browser.h"
 #include "shell/browser/electron_browser_client.h"
 #include "shell/common/application_info.h"
@@ -287,6 +288,18 @@ void SystemNetworkContextManager::OnNetworkServiceCreated(
     network_service->SetEncryptionKey(OSCrypt::GetRawEncryptionKey());
 #endif
   }
+
+  restart_callbacks_.Notify();
+
+  // Test-only event to signal Network Service has been recreated.
+  if (auto* app = electron::api::App::Get())
+    app->Emit("-network-service-created");
+}
+
+base::CallbackListSubscription
+SystemNetworkContextManager::AddNetworkServiceRestartCallback(
+    base::RepeatingClosure callback) {
+  return restart_callbacks_.Add(std::move(callback));
 }
 
 network::mojom::NetworkContextParamsPtr

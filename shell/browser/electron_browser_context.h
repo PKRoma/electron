@@ -13,6 +13,7 @@
 #include <variant>
 #include <vector>
 
+#include "base/callback_list.h"
 #include "base/files/file_path.h"
 #include "content/public/browser/browser_context.h"
 #include "content/public/browser/media_stream_request.h"
@@ -184,6 +185,9 @@ class ElectronBrowserContext : public content::BrowserContext {
   // Initialize pref registry.
   void InitPrefs();
 
+  // Called when the Network Service restarts.
+  void OnNetworkServiceRestarted();
+
   scoped_refptr<ValueMapPrefStore> in_memory_pref_store_;
   std::unique_ptr<CookieChangeNotifier> cookie_change_notifier_;
   std::unique_ptr<PrefService> prefs_;
@@ -206,6 +210,9 @@ class ElectronBrowserContext : public content::BrowserContext {
 
   // Shared URLLoaderFactory.
   scoped_refptr<network::SharedURLLoaderFactory> url_loader_factory_;
+
+  // Subscription to Network Service restart notifications.
+  base::CallbackListSubscription network_service_restart_subscription_;
 
   network::mojom::SSLConfigPtr ssl_config_;
   mojo::Remote<network::mojom::SSLConfigClient> ssl_config_client_;

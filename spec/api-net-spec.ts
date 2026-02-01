@@ -1,4 +1,4 @@
-import { net, session, ClientRequest, ClientRequestConstructorOptions, utilityProcess } from 'electron/main';
+import { app, net, session, ClientRequest, ClientRequestConstructorOptions, utilityProcess } from 'electron/main';
 
 import { expect } from 'chai';
 
@@ -10,7 +10,7 @@ import * as path from 'node:path';
 import { setTimeout } from 'node:timers/promises';
 
 import { collectStreamBody, collectStreamBodyBuffer, getResponse, kOneKiloByte, kOneMegaByte, randomBuffer, randomString, respondNTimes, respondOnce } from './lib/net-helpers';
-import { listen, defer } from './lib/spec-helpers';
+import { ifit, listen, defer } from './lib/spec-helpers';
 
 const utilityFixturePath = path.resolve(__dirname, 'fixtures', 'api', 'utility-process', 'api-net-spec.js');
 const fixturesPath = path.resolve(__dirname, 'fixtures');
@@ -1688,4 +1688,80 @@ describe('net module', () => {
       }
     });
   }
+
+  describe('Network Service crash recovery', () => {
+    ifit(process.platform !== 'linux')('should recover net.fetch after Network Service crash (main process)', async () => {
+      const serverUrl = await respondOnce.toSingleURL((request, response) => {
+        response.end('first');
+      });
+      const firstResponse = await net.fetch(serverUrl);
+      expect(firstResponse.ok).to.be.true();
+      expect(await firstResponse.text()).to.equal('first');
+
+      const metrics = app.getAppMetrics();
+      const networkServiceProcess = metrics.find(
+        m => m.type === 'Utility' && m.serviceName === 'network.mojom.NetworkService'
+      );
+      expect(networkServiceProcess).to.not.be.undefined();
+
+      const crashPromise = once(app, '-network-service-crashed');
+      const restartPromise = once(app, '-network-service-created');
+
+      process.kill(networkServiceProcess!.pid, 'SIGKILL');
+
+      await crashPromise;
+      await restartPromise;
+
+      const secondServerUrl = await respondOnce.toSingleURL((request, response) => {
+        response.end('second');
+      });
+      const secondResponse = await net.fetch(secondServerUrl);
+      expect(secondResponse.ok).to.be.true();
+      expect(await secondResponse.text()).to.equal('second');
+    });
+
+    ifit(process.platform !== 'linux')('should recover net.fetch after Network Service crash (utility process)', async () => {
+      const child = utilityProcess.fork(path.join(fixturesPath, 'api', 'utility-process', 'network-restart-test.js'));
+      await once(child, 'spawn');
+      await once(child, 'message');
+
+      const firstServerUrl = await respondOnce.toSingleURL((request, response) => {
+        response.end('utility-first');
+      });
+      child.postMessage({ type: 'fetch', url: firstServerUrl });
+      const [firstResult] = await once(child, 'message');
+      expect(firstResult.ok).to.be.true();
+      expect(firstResult.body).to.equal('utility-first');
+
+      // Find the Network Service process
+      const metrics = app.getAppMetrics();
+      const networkServiceProcess = metrics.find(
+        m => m.type === 'Utility' && m.serviceName === 'network.mojom.NetworkService'
+      );
+      expect(networkServiceProcess).to.not.be.undefined();
+
+      const crashPromise = once(app, '-network-service-crashed');
+      const restartPromise = once(app, '-network-service-created');
+
+      process.kill(networkServiceProcess!.pid, 'SIGKILL');
+
+      await crashPromise;
+      await restartPromise;
+
+      // Needed for UpdateURLLoaderFactory IPC to propagate to the utility process
+      // and for any in-flight requests to settle
+      await setTimeout(500);
+
+      const secondServerUrl = await respondOnce.toSingleURL((request, response) => {
+        response.end('utility-second');
+      });
+      child.postMessage({ type: 'fetch', url: secondServerUrl });
+      const [secondResult] = await once(child, 'message');
+      expect(secondResult.ok).to.be.true();
+      expect(secondResult.body).to.equal('utility-second');
+
+      child.kill();
+      await once(child, 'exit');
+    });
+  });
 });

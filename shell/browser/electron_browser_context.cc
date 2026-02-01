@@ -54,6 +54,7 @@
 #include "shell/browser/file_system_access/file_system_access_permission_context_factory.h"
 #include "shell/browser/media/media_device_id_salt.h"
 #include "shell/browser/net/resolve_proxy_helper.h"
+#include "shell/browser/net/system_network_context_manager.h"
 #include "shell/browser/protocol_registry.h"
 #include "shell/browser/serial/serial_chooser_context.h"
 #include "shell/browser/special_storage_policy.h"
@@ -407,10 +408,20 @@ ElectronBrowserContext::ElectronBrowserContext(
     extension_system->FinishInitialization();
   }
 #endif
+
+  // Subscribe to Network Service restart notifications to reset the cached
+  // URLLoaderFactory.
+  if (auto* manager = SystemNetworkContextManager::GetInstance()) {
+    network_service_restart_subscription_ =
+        manager->AddNetworkServiceRestartCallback(base::BindRepeating(
+            &ElectronBrowserContext::OnNetworkServiceRestarted,
+            base::Unretained(this)));
+  }
 }
 
 ElectronBrowserContext::~ElectronBrowserContext() {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
+
   NotifyWillBeDestroyed();
 
   // Notify any keyed services of browser context destruction.
@@ -566,6 +577,12 @@ content::PreconnectManager* ElectronBrowserContext::GetPreconnectManager() {
         preconnect_manager_delegate_->GetWeakPtr(), this);
   }
   return preconnect_manager_.get();
+}
+
+void ElectronBrowserContext::OnNetworkServiceRestarted() {
+  // Clear the cached URLLoaderFactory so the next request creates a new one
+  // from the new NetworkContext.
+  url_loader_factory_.reset();
 }
 
 scoped_refptr<network::SharedURLLoaderFactory>

@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 
+#include "base/callback_list.h"
 #include "base/containers/flat_map.h"
 #include "base/task/cancelable_task_tracker.h"
 #include "chrome/browser/process_singleton.h"
@@ -292,6 +293,9 @@ class App final : public gin::Wrappable<App>,
   bool disable_hw_acceleration_ = false;
   bool disable_domain_blocking_for_3DAPIs_ = false;
   bool watch_singleton_socket_on_ready_ = false;
+
+  // Subscription to Network Service process gone notifications.
+  base::CallbackListSubscription network_service_gone_subscription_;
 
   std::unique_ptr<content::ScopedAccessibilityMode> scoped_accessibility_mode_;
 };

@@ -14,7 +14,7 @@
 #include "net/base/network_change_notifier.h"
 #include "services/network/public/cpp/shared_url_loader_factory.h"
 #include "services/network/public/mojom/host_resolver.mojom.h"
-#include "services/network/public/mojom/url_loader_factory.mojom-forward.h"
+#include "services/network/public/mojom/url_loader_factory.mojom.h"
 #include "shell/services/node/public/mojom/node_service.mojom.h"
 
 namespace node {
@@ -29,25 +29,40 @@ class ElectronBindings;
 class JavascriptEnvironment;
 class NodeBindings;
 
-class URLLoaderBundle {
+class URLLoaderBundle : public network::SharedURLLoaderFactory {
  public:
   URLLoaderBundle();
-  ~URLLoaderBundle();
 
   URLLoaderBundle(const URLLoaderBundle&) = delete;
   URLLoaderBundle& operator=(const URLLoaderBundle&) = delete;
 
   static URLLoaderBundle* GetInstance();
+
   void SetURLLoaderFactory(
       mojo::PendingRemote<network::mojom::URLLoaderFactory> factory,
       mojo::Remote<network::mojom::HostResolver> host_resolver,
       bool use_network_observer_from_url_loader_factory);
+
   scoped_refptr<network::SharedURLLoaderFactory> GetSharedURLLoaderFactory();
   network::mojom::HostResolver* GetHostResolver();
   bool ShouldUseNetworkObserverfromURLLoaderFactory() const;
 
+  void CreateLoaderAndStart(
+      mojo::PendingReceiver<network::mojom::URLLoader> loader,
+      int32_t request_id,
+      uint32_t options,
+      const network::ResourceRequest& request,
+      mojo::PendingRemote<network::mojom::URLLoaderClient> client,
+      const net::MutableNetworkTrafficAnnotationTag& traffic_annotation)
+      override;
+  void Clone(mojo::PendingReceiver<network::mojom::URLLoaderFactory> receiver)
+      override;
+  std::unique_ptr<network::PendingSharedURLLoaderFactory> Clone() override;
+
  private:
-  scoped_refptr<network::SharedURLLoaderFactory> factory_;
+  ~URLLoaderBundle() override;
+
+  mojo::Remote<network::mojom::URLLoaderFactory> factory_remote_;
   mojo::Remote<network::mojom::HostResolver> host_resolver_;
   bool should_use_network_observer_from_url_loader_factory_ = false;
 };
@@ -65,6 +80,9 @@ class NodeService : public node::mojom::NodeService {
   void Initialize(node::mojom::NodeServiceParamsPtr params,
                   mojo::PendingRemote<node::mojom::NodeServiceClient>
                       client_pending_remote) override;
+  void UpdateURLLoaderFactory(
+      mojo::PendingRemote<network::mojom::URLLoaderFactory> url_loader_factory,
+      mojo::PendingRemote<network::mojom::HostResolver> host_resolver) override;
 
  private:
   // This needs to be initialized first so that it can be destroyed last

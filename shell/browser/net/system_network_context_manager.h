@@ -5,6 +5,7 @@
 #ifndef ELECTRON_SHELL_BROWSER_NET_SYSTEM_NETWORK_CONTEXT_MANAGER_H_
 #define ELECTRON_SHELL_BROWSER_NET_SYSTEM_NETWORK_CONTEXT_MANAGER_H_
 
+#include "base/callback_list.h"
 #include "chrome/browser/net/proxy_config_monitor.h"
 #include "mojo/public/cpp/bindings/remote.h"
 #include "net/base/features.h"
@@ -83,6 +84,11 @@ class SystemNetworkContextManager {
   // SystemNetworkContext, if the network service is enabled.
   void OnNetworkServiceCreated(network::mojom::NetworkService* network_service);
 
+  // Subscribe to Network Service restart notifications. Returns a subscription
+  // that will automatically unsubscribe when destroyed.
+  base::CallbackListSubscription AddNetworkServiceRestartCallback(
+      base::RepeatingClosure callback);
+
  private:
   class URLLoaderFactoryForSystem;
 
@@ -102,6 +108,9 @@ class SystemNetworkContextManager {
   // consumers don't all need to create their own factory.
   scoped_refptr<URLLoaderFactoryForSystem> shared_url_loader_factory_;
   mojo::Remote<network::mojom::URLLoaderFactory> url_loader_factory_;
+
+  // Callbacks notified when Network Service restarts.
+  base::RepeatingClosureList restart_callbacks_;
 };
 
 #endif  // ELECTRON_SHELL_BROWSER_NET_SYSTEM_NETWORK_CONTEXT_MANAGER_H_

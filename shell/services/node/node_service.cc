@@ -8,13 +8,13 @@
 #include <utility>
 
 #include "base/command_line.h"
+#include "base/memory/ref_counted.h"
 #include "base/no_destructor.h"
 #include "base/process/process.h"
 #include "base/strings/utf_string_conversions.h"
 #include "electron/fuses.h"
 #include "electron/mas.h"
 #include "net/base/network_change_notifier.h"
-#include "services/network/public/cpp/wrapper_shared_url_loader_factory.h"
 #include "services/network/public/mojom/host_resolver.mojom.h"
 #include "services/network/public/mojom/network_context.mojom.h"
 #include "shell/browser/javascript_environment.h"
@@ -56,22 +56,26 @@ void V8FatalErrorCallback(const char* location, const char* message) {
   *zero = 0;
 }
 
-URLLoaderBundle::URLLoaderBundle() = default;
+// URLLoaderBundle implementation
+URLLoaderBundle::URLLoaderBundle() {
+  // Add an extra reference to prevent the singleton from ever being deleted
+  AddRef();
+}
 
 URLLoaderBundle::~URLLoaderBundle() = default;
 
 URLLoaderBundle* URLLoaderBundle::GetInstance() {
-  static base::NoDestructor<URLLoaderBundle> instance;
-  return instance.get();
+  static URLLoaderBundle* instance = new URLLoaderBundle();
+  return instance;
 }
 
 void URLLoaderBundle::SetURLLoaderFactory(
     mojo::PendingRemote<network::mojom::URLLoaderFactory> pending_factory,
     mojo::Remote<network::mojom::HostResolver> host_resolver,
     bool use_network_observer_from_url_loader_factory) {
-  factory_ = network::SharedURLLoaderFactory::Create(
-      std::make_unique<network::WrapperPendingSharedURLLoaderFactory>(
-          std::move(pending_factory)));
+  // Reset the old remote before binding the new one
+  factory_remote_.reset();
+  factory_remote_.Bind(std::move(pending_factory));
   host_resolver_ = std::move(host_resolver);
   should_use_network_observer_from_url_loader_factory_ =
       use_network_observer_from_url_loader_factory;
@@ -79,7 +83,35 @@ void URLLoaderBundle::SetURLLoaderFactory(
 
 scoped_refptr<network::SharedURLLoaderFactory>
 URLLoaderBundle::GetSharedURLLoaderFactory() {
-  return factory_;
+  // Return ourselves since we implement SharedURLLoaderFactory
+  return scoped_refptr<network::SharedURLLoaderFactory>(this);
+}
+
+void URLLoaderBundle::CreateLoaderAndStart(
+    mojo::PendingReceiver<network::mojom::URLLoader> loader,
+    int32_t request_id,
+    uint32_t options,
+    const network::ResourceRequest& request,
+    mojo::PendingRemote<network::mojom::URLLoaderClient> client,
+    const net::MutableNetworkTrafficAnnotationTag& traffic_annotation) {
+  if (factory_remote_.is_bound() && factory_remote_.is_connected()) {
+    factory_remote_->CreateLoaderAndStart(std::move(loader), request_id,
+                                          options, request, std::move(client),
+                                          traffic_annotation);
+  }
+}
+
+void URLLoaderBundle::Clone(
+    mojo::PendingReceiver<network::mojom::URLLoaderFactory> receiver) {
+  if (factory_remote_.is_bound() && factory_remote_.is_connected()) {
+    factory_remote_->Clone(std::move(receiver));
+  }
+}
+
+std::unique_ptr<network::PendingSharedURLLoaderFactory>
+URLLoaderBundle::Clone() {
+  // Return nullptr - callers should use GetSharedURLLoaderFactory() instead
+  return nullptr;
 }
 
 network::mojom::HostResolver* URLLoaderBundle::GetHostResolver() {
@@ -206,6 +238,15 @@ void NodeService::Initialize(
   // Run entry script.
   node_bindings_->PrepareEmbedThread();
   node_bindings_->StartPolling();
+}
+
+void NodeService::UpdateURLLoaderFactory(
+    mojo::PendingRemote<network::mojom::URLLoaderFactory> url_loader_factory,
+    mojo::PendingRemote<network::mojom::HostResolver> host_resolver) {
+  URLLoaderBundle::GetInstance()->SetURLLoaderFactory(
+      std::move(url_loader_factory), mojo::Remote(std::move(host_resolver)),
+      URLLoaderBundle::GetInstance()
+          ->ShouldUseNetworkObserverfromURLLoaderFactory());
 }
 
 }  // namespace electron
