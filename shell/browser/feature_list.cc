@@ -11,7 +11,6 @@
 #include "base/feature_list.h"
 #include "base/metrics/field_trial.h"
 #include "components/spellcheck/common/spellcheck_features.h"
-#include "content/common/features.h"
 #include "content/public/common/content_features.h"
 #include "electron/buildflags/buildflags.h"
 #include "media/base/media_switches.h"
@@ -85,13 +84,6 @@ void InitializeFeatureList() {
   // See https://bit.ly/31yqMJR.: Access is denied. (0x5)
   disable_features +=
       std::string(",") + sandbox::policy::features::kNetworkServiceSandbox.name;
-#endif
-
-#if BUILDFLAG(IS_MAC)
-  disable_features +=
-      // MacWebContentsOcclusion is causing some odd visibility
-      // issues with multiple web contents
-      std::string(",") + features::kMacWebContentsOcclusion.name;
 #endif
 
 #if BUILDFLAG(ENABLE_PDF_VIEWER)
