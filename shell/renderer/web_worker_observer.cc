@@ -173,8 +173,7 @@ void WebWorkerObserver::ShareEnvironmentWithContext(
 
   // Copy Buffer from the original context if it exists.
   v8::Local<v8::Value> buffer_value;
-  if (original_global
-          ->Get(original_context, gin::StringToV8(isolate, "Buffer"))
+  if (original_global->Get(original_context, gin::StringToV8(isolate, "Buffer"))
           .ToLocal(&buffer_value) &&
       !buffer_value->IsUndefined()) {
     new_global
@@ -196,12 +195,10 @@ void WebWorkerObserver::ShareEnvironmentWithContext(
     // If not, copy from the original context.
     std::string blink_key = base::StrCat({"blink", key});
     v8::Local<v8::Value> orig_value;
-    if (original_global
-            ->Get(original_context, gin::StringToV8(isolate, key))
+    if (original_global->Get(original_context, gin::StringToV8(isolate, key))
             .ToLocal(&orig_value) &&
         !orig_value->IsUndefined()) {
-      new_global
-          ->Set(worker_context, gin::StringToV8(isolate, key), orig_value)
+      new_global->Set(worker_context, gin::StringToV8(isolate, key), orig_value)
           .Check();
     }
   }
