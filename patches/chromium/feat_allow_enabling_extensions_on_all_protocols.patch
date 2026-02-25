@@ -1,0 +1,84 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Niklas Wenzel <dev@nikwen.de>
+Date: Wed, 25 Feb 2026 16:24:03 +0100
+Subject: feat: allow enabling extensions on all protocols
+
+This allows us to use Chrome extensions on custom protocols.
+
+The patch can't really be upstreamed, unfortunately, because there are
+other URLPattern functions that we don't patch that Chrome needs.
+
+Patching those properly would require replacing the bitmap logic in
+URLPattern with a more flexible solution. This would be a larger effort
+and Chromium might reject it for performance reasons.
+
+See: https://source.chromium.org/chromium/chromium/src/+/main:extensions/common/url_pattern.h;l=53-74;drc=50dbcddad2f8e36ddfcec21d4551f389df425c37
+
+This patch makes it work in the context of Electron.
+
+diff --git a/extensions/common/url_pattern.cc b/extensions/common/url_pattern.cc
+index 4054af728030306c5473f9a47e580595596768a0..38c3f5976a122e6e4b7e8512ef977242fa395d8d 100644
+--- a/extensions/common/url_pattern.cc
++++ b/extensions/common/url_pattern.cc
+@@ -133,6 +133,13 @@ std::string_view CanonicalizeHostForMatching(std::string_view host_piece) {
+ 
+ }  // namespace
+ 
++bool URLPattern::enable_extensions_on_all_protocols_ = false;
++
++// static
++void URLPattern::EnableExtensionsOnAllProtocols() {
++  enable_extensions_on_all_protocols_ = true;
++}
++
+ // static
+ bool URLPattern::IsValidSchemeForExtensions(std::string_view scheme) {
+   for (auto* valid_scheme : kValidSchemes) {
+@@ -140,11 +147,14 @@ bool URLPattern::IsValidSchemeForExtensions(std::string_view scheme) {
+       return true;
+     }
+   }
+-  return false;
++  return enable_extensions_on_all_protocols_;
+ }
+ 
+ // static
+ int URLPattern::GetValidSchemeMaskForExtensions() {
++  if (enable_extensions_on_all_protocols_) {
++    return SCHEME_ALL;
++  }
+   int result = 0;
+   for (int valid_scheme_mask : kValidSchemeMasks) {
+     result |= valid_scheme_mask;
+@@ -401,7 +411,7 @@ bool URLPattern::IsValidScheme(std::string_view scheme) const {
+     }
+   }
+ 
+-  return false;
++  return enable_extensions_on_all_protocols_;
+ }
+ 
+ void URLPattern::SetPath(std::string_view path) {
+diff --git a/extensions/common/url_pattern.h b/extensions/common/url_pattern.h
+index 4d09251b0160644d86682ad3db7c41b50f360e6f..78978b82e37e080add6680300d09503acdb663db 100644
+--- a/extensions/common/url_pattern.h
++++ b/extensions/common/url_pattern.h
+@@ -96,6 +96,8 @@ class URLPattern {
+   // Returns the mask for all schemes considered valid for extensions.
+   static int GetValidSchemeMaskForExtensions();
+ 
++  static void EnableExtensionsOnAllProtocols();
++
+   explicit URLPattern(int valid_schemes);
+ 
+   // Convenience to construct a URLPattern from a string. If the string is not
+@@ -251,6 +253,9 @@ class URLPattern {
+   // Get an error string for a ParseResult.
+   static const char* GetParseResultString(URLPattern::ParseResult parse_result);
+ 
++ protected:
++  static bool enable_extensions_on_all_protocols_;
++
+  private:
+   // Returns true if any of the `schemes` items matches our scheme.
+   bool MatchesAnyScheme(const std::vector<std::string>& schemes) const;
