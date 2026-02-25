@@ -4,7 +4,19 @@ import { app, dialog, BrowserWindow, ipcMain } from 'electron/main';
 import * as path from 'node:path';
 import * as url from 'node:url';
 
+import { startMemoryMetricsTimer, stopMemoryMetricsTimer, consoleMetricReporter } from './memory-metrics.js';
+
 let mainWindow: BrowserWindow | null = null;
+
+// Start memory metrics collection every 4 hours
+app.whenReady().then(() => {
+  startMemoryMetricsTimer(consoleMetricReporter);
+});
+
+// Clean up timer on quit
+app.on('will-quit', () => {
+  stopMemoryMetricsTimer();
+});
 
 // Quit when all windows are closed.
 app.on('window-all-closed', () => {
