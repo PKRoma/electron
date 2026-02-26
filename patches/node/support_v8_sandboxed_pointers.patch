@@ -235,64 +235,10 @@ index 754ddf7b331465c56081db05d6fd2a45fe50596a..db1ed241f730791ba3e3f93349cb5ff3
    std::vector<SnapshotIndex> primitive_values;
    std::vector<PropInfo> template_values;
 diff --git a/src/node_buffer.cc b/src/node_buffer.cc
-index ddee7b7e40c3ee4054b2b15b75154607aa6431ed..9b74343d01913a27bde608d73d890ae127143960 100644
+index e1bee00825d140232456d6dc2337420fde6bda17..56074af6a7657124a2541c48d31b90710613ab2d 100644
 --- a/src/node_buffer.cc
 +++ b/src/node_buffer.cc
-@@ -81,6 +81,7 @@ using v8::SharedArrayBuffer;
- using v8::String;
- using v8::Uint32;
- using v8::Uint8Array;
-+using v8::Uint32Array;
- using v8::Value;
- 
- namespace {
-@@ -1243,6 +1244,45 @@ void SetBufferPrototype(const FunctionCallbackInfo<Value>& args) {
-   realm->set_buffer_prototype_object(proto);
- }
- 
-+void GetZeroFillToggle(const FunctionCallbackInfo<Value>& args) {
-+  Environment* env = Environment::GetCurrent(args);
-+  NodeArrayBufferAllocator* allocator = env->isolate_data()->node_allocator();
-+  Local<ArrayBuffer> ab;
-+  // It can be a nullptr when running inside an isolate where we
-+  // do not own the ArrayBuffer allocator.
-+  if (allocator == nullptr || env->isolate_data()->is_building_snapshot()) {
-+    // Create a dummy Uint32Array - the JS land can only toggle the C++ land
-+    // setting when the allocator uses our toggle. With this the toggle in JS
-+    // land results in no-ops.
-+    // When building a snapshot, just use a dummy toggle as well to avoid
-+    // introducing the dynamic external reference. We'll re-initialize the
-+    // toggle with a real one connected to the C++ allocator after snapshot
-+    // deserialization.
-+
-+    ab = ArrayBuffer::New(env->isolate(), sizeof(uint32_t));
-+  } else {
-+    // TODO(joyeecheung): save ab->GetBackingStore()->Data() in the Node.js
-+    // array buffer allocator and include it into the C++ toggle while the
-+    // Environment is still alive.
-+    uint32_t* zero_fill_field = allocator->zero_fill_field();
-+    std::unique_ptr<BackingStore> backing =
-+        ArrayBuffer::NewBackingStore(zero_fill_field,
-+                                     sizeof(*zero_fill_field),
-+                                     [](void*, size_t, void*) {},
-+                                     nullptr);
-+    ab = ArrayBuffer::New(env->isolate(), std::move(backing));
-+  }
-+
-+  if (ab->SetPrivate(env->context(),
-+                     env->untransferable_object_private_symbol(),
-+                     True(env->isolate()))
-+          .IsNothing()) {
-+    return;
-+  }
-+
-+  args.GetReturnValue().Set(Uint32Array::New(ab, 0, 1));
-+}
-+
- static void Btoa(const FunctionCallbackInfo<Value>& args) {
-   CHECK_EQ(args.Length(), 1);
-   Environment* env = Environment::GetCurrent(args);
-@@ -1420,7 +1460,7 @@ inline size_t CheckNumberToSize(Local<Value> number) {
+@@ -1443,7 +1443,7 @@ inline size_t CheckNumberToSize(Local<Value> number) {
    CHECK(value >= 0 && value < maxSize);
    size_t size = static_cast<size_t>(value);
  #ifdef V8_ENABLE_SANDBOX
