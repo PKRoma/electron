@@ -59,8 +59,9 @@ sudo cp "$TESTFILES/electron/script/qemu-init.sh" "$ROOTFS_DIR/init"
 sudo chmod +x "$ROOTFS_DIR/init"
 
 echo "Creating disk image with root filesystem"
+df -h
 DISK_IMG=$(mktemp)
-dd if=/dev/zero of="$DISK_IMG" bs=1M count=2048 status=none
+dd if=/dev/zero of="$DISK_IMG" bs=1M count=20480 status=none
 sudo mkfs.ext4 -q -d "$ROOTFS_DIR" "$DISK_IMG"
 sudo rm -rf "$ROOTFS_DIR"
 
