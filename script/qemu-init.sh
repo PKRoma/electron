@@ -21,29 +21,13 @@ cat /proc/sys/kernel/random/uuid | tr -d '-' > /etc/machine-id
 echo "Setting system clock"
 date -s "$(cat /host-time)"
 
-echo "Setting up networking"
-ip link set lo up
-ip link set eth0 up
-ip addr add 10.0.2.15/24 dev eth0
-ip route add default via 10.0.2.2
-echo "nameserver 10.0.2.3" > /etc/resolv.conf
-
-echo "Loading 9p kernel modules"
-modprobe 9pnet
-modprobe 9pnet_virtio
-modprobe 9p
-
-echo "Mounting test files from host via 9p"
-mkdir -p /mnt/testfiles
-mount -t 9p -o trans=virtio,version=9p2000.L testfiles /mnt/testfiles
 
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 export XDG_RUNTIME_DIR=/run/user/0
 
 echo "Starting entrypoint"
 echo "System: $(uname -s) $(uname -r) $(uname -m), page size: $(getconf PAGESIZE) bytes"
-ls -l /mnt/testfiles
-/mnt/testfiles/out/Default/electron --version
+/root/src/out/Default/electron --version
 EXIT_CODE=$?
 echo "Test execution finished with exit code $EXIT_CODE"
 echo $EXIT_CODE > /exit-code

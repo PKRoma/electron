@@ -34,10 +34,8 @@ docker system prune -f || true
 
 echo "Downloading Ubuntu 24.04 generic-64k kernel and modules for ARM64"
 KERNEL_URL="http://ports.ubuntu.com/ubuntu-ports/pool/main/l/linux/linux-image-unsigned-6.8.0-90-generic-64k_6.8.0-90.91_arm64.deb"
-MODULES_URL="http://ports.ubuntu.com/ubuntu-ports/pool/main/l/linux/linux-modules-6.8.0-90-generic-64k_6.8.0-90.91_arm64.deb"
 KERNEL_DIR=$(mktemp -d)
 curl -fL "$KERNEL_URL" -o "$KERNEL_DIR/kernel.deb"
-curl -fL "$MODULES_URL" -o "$KERNEL_DIR/modules.deb"
 
 echo "Extracting kernel"
 (cd "$KERNEL_DIR" && ar x kernel.deb && tar xf data.tar*)
@@ -47,10 +45,7 @@ if [ ! -f "$VMLINUZ" ]; then
 	exit 1
 fi
 
-echo "Extracting kernel modules"
-MODULES_DIR=$(mktemp -d)
-(cd "$MODULES_DIR" && ar x "$KERNEL_DIR/modules.deb" && tar xf data.tar*)
-sudo cp -r "$MODULES_DIR/lib/modules" "$ROOTFS_DIR/lib/"
+sudo cp -r $TESTFILES "$ROOTFS_DIR"
 
 echo "Storing test arguments and installing init script"
 echo "$ARGS" > "$ROOTFS_DIR/test-args"
