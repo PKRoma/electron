@@ -129,10 +129,10 @@ index 416e541436d201aabca26cdbf7e8477103bd014c..8c5f92b03d67e5f0587b0e9420969061
  }
  
 diff --git a/base/allocator/partition_allocator/src/partition_alloc/BUILD.gn b/base/allocator/partition_allocator/src/partition_alloc/BUILD.gn
-index efc8000d298955316bdf2ab72a3c991d4d46aece..0c2ca4b1fc2f4368da32ad4730becb55a8fdbf46 100644
+index 08687f5bf1312138f078bef64898235a7cab1f26..f662542733d0e8a0d27a6594942c8533287902bd 100644
 --- a/base/allocator/partition_allocator/src/partition_alloc/BUILD.gn
 +++ b/base/allocator/partition_allocator/src/partition_alloc/BUILD.gn
-@@ -977,6 +977,7 @@ if (is_clang_or_gcc) {
+@@ -969,6 +969,7 @@ if (is_clang_or_gcc) {
        ":allocator_base",
        ":allocator_core",
        ":buildflags",
@@ -2261,10 +2261,10 @@ index 93e90c4eba9bc9b93d68e834eb6baabeb2d0ecf0..1b90f41d05f847a94adf2f4da827b1d0
  
  }  // namespace
 diff --git a/ui/display/BUILD.gn b/ui/display/BUILD.gn
-index 47da87797a4a6e2163fc356955b516d6c7a2f276..87d7cac13dfe0bd5ec91398f7fe75c0c28ef0474 100644
+index c09f41bea0da71a885d682fbb1e678d26f0d0284..aa5d07bd04af4f404026c20821859068c8e131e7 100644
 --- a/ui/display/BUILD.gn
 +++ b/ui/display/BUILD.gn
-@@ -140,6 +140,12 @@ component("display") {
+@@ -142,6 +142,12 @@ component("display") {
      "//ui/gfx/geometry",
    ]
  
