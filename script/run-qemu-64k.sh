@@ -45,7 +45,7 @@ if [ ! -f "$VMLINUZ" ]; then
 	exit 1
 fi
 
-sudo cp -r $TESTFILES "$ROOTFS_DIR"
+sudo cp -r $TESTFILES "$ROOTFS_DIR/root/"
 
 echo "Storing test arguments and installing init script"
 echo "$ARGS" > "$ROOTFS_DIR/test-args"
