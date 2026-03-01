@@ -18,7 +18,7 @@ This can be removed when Node.js upgrades to a version of V8 containing CLs
 from the above issue.
 
 diff --git a/src/api/environment.cc b/src/api/environment.cc
-index 5f51ad205189bd75d0d9638b1104c12b537b4e9b..8974bac7dca43294cc5cc4570f8e2e78f42aefaa 100644
+index ab2e72006b68feb6239214362aa57d35725ff35d..900d967b2b0490bcc5072ca780af63393dcddded 100644
 --- a/src/api/environment.cc
 +++ b/src/api/environment.cc
 @@ -331,6 +331,10 @@ Isolate* NewIsolate(Isolate::CreateParams* params,
