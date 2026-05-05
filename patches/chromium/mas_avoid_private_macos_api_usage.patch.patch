@@ -1974,7 +1974,7 @@ index 50e20152256616c07cd4a3de44fd18689fd7a8b7..4ab3a4b880a63f19f99b96dec1c30946
    // The root CALayer to display the current frame. This does not change
    // over the lifetime of the object.
 diff --git a/ui/accelerated_widget_mac/ca_layer_tree_coordinator.mm b/ui/accelerated_widget_mac/ca_layer_tree_coordinator.mm
-index a751568865da9bfafe4347a59a8d4af69f37e2f9..de07e246ef17e776a06bc3b38c226ec7eda779f0 100644
+index a751568865da9bfafe4347a59a8d4af69f37e2f9..00f5c9bb8a8ce8ced359aa65dca88303da282860 100644
 --- a/ui/accelerated_widget_mac/ca_layer_tree_coordinator.mm
 +++ b/ui/accelerated_widget_mac/ca_layer_tree_coordinator.mm
 @@ -10,6 +10,7 @@
@@ -2001,7 +2001,23 @@ index a751568865da9bfafe4347a59a8d4af69f37e2f9..de07e246ef17e776a06bc3b38c226ec7
  }
  
  CALayerTreeCoordinator::~CALayerTreeCoordinator() = default;
-@@ -212,7 +215,7 @@
+@@ -184,6 +187,7 @@
+ #if BUILDFLAG(IS_MAC)
+     // Create a new CAContext at the new size. This allows new frame update at
+     // the new size to be atomic with things like resizing the NSWindow.
++#if !IS_MAS_BUILD()
+     if (allow_remote_layers_) {
+       params.ca_context_fence_mach_port.reset([ca_context_ createFencePort]);
+       [ca_context_ setFencePort:params.ca_context_fence_mach_port.get()];
+@@ -191,6 +195,7 @@
+       ca_context_ = nil;
+       current_tree = nullptr;
+     }
++#endif  // !IS_MAS_BUILD()
+ #endif
+     has_resized_since_last_swap_ = false;
+   }
+@@ -212,7 +217,7 @@
      TRACE_EVENT_INSTANT("test_gpu", "SwapBuffers", "GLImpl",
                          static_cast<int>(gl::GetGLImplementation()), "width",
                          pixel_size_.width());
@@ -2010,7 +2026,7 @@ index a751568865da9bfafe4347a59a8d4af69f37e2f9..de07e246ef17e776a06bc3b38c226ec7
      if (allow_remote_layers_) {
        if (!ca_context_) {
          // Create the CAContext to send this to the GPU process, and the layer
-@@ -233,6 +236,9 @@
+@@ -233,6 +238,9 @@
        }
        params.ca_context_id = [ca_context_ contextId];
      } else {
