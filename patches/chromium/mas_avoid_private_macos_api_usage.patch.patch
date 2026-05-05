@@ -50,7 +50,7 @@ system font by checking if it's kCTFontPriorityAttribute is set to
 system priority.
 
 diff --git a/base/BUILD.gn b/base/BUILD.gn
-index feab31731067e946a55ac2bd13fa0f600659297d..568db42c7e3f2982615c7414f94cc48668fc4f5b 100644
+index 463225c753fa1c44fa98a6121c1f8ddc1ec0166a..fb668e0dc1847593aff5e13ff5aca6ee079b5677 100644
 --- a/base/BUILD.gn
 +++ b/base/BUILD.gn
 @@ -1125,6 +1125,7 @@ component("base") {
@@ -811,7 +811,7 @@ index 8ce53b96b400611f5d8a94155c6ff6191fcb5963..dea308562c23388eb6b5749d2eb3e30e
  
  - (NSWindow*)rootWindow {
 diff --git a/components/remote_cocoa/app_shim/native_widget_ns_window_bridge.mm b/components/remote_cocoa/app_shim/native_widget_ns_window_bridge.mm
-index 93a08d658fefa5041e83b42c572170367eb21f3a..0c9e5982875230b9aa5a3b809dfc852fc30c14cf 100644
+index 2c9f428f3af5d142919b3b289980314d84937d1d..65f01861139c26ed11de01c67b52a8b8dcd1ac6b 100644
 --- a/components/remote_cocoa/app_shim/native_widget_ns_window_bridge.mm
 +++ b/components/remote_cocoa/app_shim/native_widget_ns_window_bridge.mm
 @@ -42,6 +42,7 @@
@@ -822,7 +822,7 @@ index 93a08d658fefa5041e83b42c572170367eb21f3a..0c9e5982875230b9aa5a3b809dfc852f
  #include "mojo/public/cpp/bindings/self_owned_receiver.h"
  #include "net/cert/x509_util_apple.h"
  #include "ui/accelerated_widget_mac/window_resize_helper_mac.h"
-@@ -75,10 +76,13 @@
+@@ -77,10 +78,13 @@
  using CGRegionRef = CFTypeRef;
  
  CG_EXTERN CGSConnectionID CGSMainConnectionID(void);
@@ -836,7 +836,7 @@ index 93a08d658fefa5041e83b42c572170367eb21f3a..0c9e5982875230b9aa5a3b809dfc852f
  
  namespace {
  constexpr auto kUIPaintTimeout = base::Milliseconds(500);
-@@ -756,10 +760,12 @@ NSUInteger CountBridgedWindows(NSArray* child_windows) {
+@@ -762,10 +766,12 @@ NSUInteger CountBridgedWindows(NSArray* child_windows) {
    // this should be treated as an error and caught early.
    CHECK(bridged_view_);
  
@@ -849,7 +849,7 @@ index 93a08d658fefa5041e83b42c572170367eb21f3a..0c9e5982875230b9aa5a3b809dfc852f
  
    // Beware: This view was briefly removed (in favor of a bare CALayer) in
    // https://crrev.com/c/1236675. The ordering of unassociated layers relative
-@@ -1258,6 +1264,7 @@ NSUInteger CountBridgedWindows(NSArray* child_windows) {
+@@ -1262,6 +1268,7 @@ NSUInteger CountBridgedWindows(NSArray* child_windows) {
  }
  
  void NativeWidgetNSWindowBridge::SetAllowScreenshots(bool allow) {
@@ -857,7 +857,7 @@ index 93a08d658fefa5041e83b42c572170367eb21f3a..0c9e5982875230b9aa5a3b809dfc852f
    CGSConnectionID connection_id = CGSMainConnectionID();
    CGSWindowID window_id = ns_window().windowNumber;
    CGRect frame = ns_window().frame;
-@@ -1267,6 +1274,10 @@ NSUInteger CountBridgedWindows(NSArray* child_windows) {
+@@ -1271,6 +1278,10 @@ NSUInteger CountBridgedWindows(NSArray* child_windows) {
      region.reset(CGRegionCreateWithRect(frame));
    }
    CGSSetWindowCaptureExcludeShape(connection_id, window_id, region.get());
@@ -974,7 +974,7 @@ index 91a0eee3a76257906f038844922f18fd4765ea66..af6ce45c11ece7ebe6b7cb70673b0c12
    return kAttributes;
  }
 diff --git a/content/browser/BUILD.gn b/content/browser/BUILD.gn
-index 9280c8633ff968e846d829937839141684c2822e..ba6c8101746d3dc4e08d46b7476047903b14919b 100644
+index 2d0c66ed2fe451d2d1fa7270fa75df405356e4b0..a8ae431260312afbd498dbbcb08a47f8ae28c031 100644
 --- a/content/browser/BUILD.gn
 +++ b/content/browser/BUILD.gn
 @@ -365,6 +365,7 @@ source_set("browser") {
@@ -1189,10 +1189,10 @@ index a1068589ad844518038ee7bc15a3de9bc5cba525..1ff781c49f086ec8015c7d3c44567dbe
  
  }  // namespace content
 diff --git a/content/test/BUILD.gn b/content/test/BUILD.gn
-index 9cf3dd2f4c453174fef0fdd498492e563c0ddc08..7111f8bf83acdbe817f1fe2cd4a0a451edf5f91c 100644
+index a5f74eed83ca77e2f59cc2156420d1f189972d94..2309ca2f1a74ade63690e8aef98e446eb37fdeba 100644
 --- a/content/test/BUILD.gn
 +++ b/content/test/BUILD.gn
-@@ -702,6 +702,7 @@ static_library("test_support") {
+@@ -703,6 +703,7 @@ static_library("test_support") {
      "//url",
      "//url/mojom:url_mojom_gurl",
      "//v8",
@@ -1200,7 +1200,7 @@ index 9cf3dd2f4c453174fef0fdd498492e563c0ddc08..7111f8bf83acdbe817f1fe2cd4a0a451
    ]
  
    data_deps = [
-@@ -1177,6 +1178,8 @@ static_library("browsertest_support") {
+@@ -1179,6 +1180,8 @@ static_library("browsertest_support") {
    # TODO(crbug.com/40031409): Fix code that adds exit-time destructors and
    # enable the diagnostic by removing this line.
    configs += [ "//build/config/compiler:no_exit_time_destructors" ]
@@ -1209,7 +1209,7 @@ index 9cf3dd2f4c453174fef0fdd498492e563c0ddc08..7111f8bf83acdbe817f1fe2cd4a0a451
  }
  
  mojom("content_test_mojo_bindings") {
-@@ -2075,6 +2078,7 @@ test("content_browsertests") {
+@@ -2078,6 +2081,7 @@ test("content_browsertests") {
      "//ui/shell_dialogs",
      "//ui/snapshot",
      "//ui/webui:test_support",
@@ -1217,7 +1217,7 @@ index 9cf3dd2f4c453174fef0fdd498492e563c0ddc08..7111f8bf83acdbe817f1fe2cd4a0a451
    ]
  
    if (!(is_chromeos && target_cpu == "arm64" && current_cpu == "arm")) {
-@@ -3457,6 +3461,7 @@ test("content_unittests") {
+@@ -3460,6 +3464,7 @@ test("content_unittests") {
      "//ui/shell_dialogs",
      "//ui/webui:test_support",
      "//url",
@@ -1308,7 +1308,7 @@ index 03a74b7d29f12be3a5d208b43beaa13f47a8e4a6..d36254ca28c1a3a4ef2b15cfbb327212
      if (is_ios) {
        sources += [ "image_transport_surface_ios.mm" ]
 diff --git a/gpu/ipc/service/image_transport_surface_overlay_mac.h b/gpu/ipc/service/image_transport_surface_overlay_mac.h
-index 2673d642f34f2a88281ecc45fe7840f6ce7e3adf..c04c2f9a27bfc5169314bf5d05476bcebe79c291 100644
+index ef51c39e966b29ae4557186773c5354dc827717f..56f61fbfd9d6ae1c3dca0860062ad07f10257272 100644
 --- a/gpu/ipc/service/image_transport_surface_overlay_mac.h
 +++ b/gpu/ipc/service/image_transport_surface_overlay_mac.h
 @@ -9,6 +9,7 @@
@@ -1943,7 +1943,7 @@ index 0f8a6f75b7f01029adc2f5fd23559bacce19cf72..cf66c2f4f02a8e21cc83c3b7389fc515
  }
  
 diff --git a/ui/accelerated_widget_mac/ca_layer_tree_coordinator.h b/ui/accelerated_widget_mac/ca_layer_tree_coordinator.h
-index 8542a74f1b0e90cd32c0220ef2e82c7763b1ee97..52c989796a2251b52615a04028fece3903e75151 100644
+index 50e20152256616c07cd4a3de44fd18689fd7a8b7..4ab3a4b880a63f19f99b96dec1c309462a8c11b9 100644
 --- a/ui/accelerated_widget_mac/ca_layer_tree_coordinator.h
 +++ b/ui/accelerated_widget_mac/ca_layer_tree_coordinator.h
 @@ -8,13 +8,16 @@
@@ -1963,7 +1963,7 @@ index 8542a74f1b0e90cd32c0220ef2e82c7763b1ee97..52c989796a2251b52615a04028fece39
  @class CALayer;
  @protocol MTLDevice;
  
-@@ -120,7 +123,9 @@ class ACCELERATED_WIDGET_MAC_EXPORT CALayerTreeCoordinator {
+@@ -124,7 +127,9 @@ class ACCELERATED_WIDGET_MAC_EXPORT CALayerTreeCoordinator {
    // both the current tree and the pending trees.
    size_t presented_ca_layer_trees_max_length_ = 2;
  
@@ -1974,7 +1974,7 @@ index 8542a74f1b0e90cd32c0220ef2e82c7763b1ee97..52c989796a2251b52615a04028fece39
    // The root CALayer to display the current frame. This does not change
    // over the lifetime of the object.
 diff --git a/ui/accelerated_widget_mac/ca_layer_tree_coordinator.mm b/ui/accelerated_widget_mac/ca_layer_tree_coordinator.mm
-index 00de2fe5bcc1bf45296f186d16b69ecf4215226c..9866fc255ebbe770928fcf9c3e694642b6629925 100644
+index a751568865da9bfafe4347a59a8d4af69f37e2f9..de07e246ef17e776a06bc3b38c226ec7eda779f0 100644
 --- a/ui/accelerated_widget_mac/ca_layer_tree_coordinator.mm
 +++ b/ui/accelerated_widget_mac/ca_layer_tree_coordinator.mm
 @@ -10,6 +10,7 @@
@@ -1993,20 +1993,25 @@ index 00de2fe5bcc1bf45296f186d16b69ecf4215226c..9866fc255ebbe770928fcf9c3e694642
    if (allow_remote_layers_) {
      root_ca_layer_ = [[CALayer alloc] init];
  #if BUILDFLAG(IS_MAC)
-@@ -67,6 +69,7 @@
+@@ -51,6 +53,7 @@
  #endif
-     ca_context_.layer = root_ca_layer_;
+     root_ca_layer_.opaque = YES;
    }
 +#endif
  }
  
  CALayerTreeCoordinator::~CALayerTreeCoordinator() = default;
-@@ -209,9 +212,13 @@
+@@ -212,7 +215,7 @@
      TRACE_EVENT_INSTANT("test_gpu", "SwapBuffers", "GLImpl",
                          static_cast<int>(gl::GetGLImplementation()), "width",
                          pixel_size_.width());
+-
 +#if !IS_MAS_BUILD()
      if (allow_remote_layers_) {
+       if (!ca_context_) {
+         // Create the CAContext to send this to the GPU process, and the layer
+@@ -233,6 +236,9 @@
+       }
        params.ca_context_id = [ca_context_ contextId];
      } else {
 +#else
@@ -2016,7 +2021,7 @@ index 00de2fe5bcc1bf45296f186d16b69ecf4215226c..9866fc255ebbe770928fcf9c3e694642
        if (io_surface) {
          DCHECK(!allow_remote_layers_);
 diff --git a/ui/accelerated_widget_mac/display_ca_layer_tree.mm b/ui/accelerated_widget_mac/display_ca_layer_tree.mm
-index 862094f2f03a18b22bdfd5095731614fec6da795..8bb9f07b885919caceaf3bec2494375bb41d4d41 100644
+index 498b40b60c7fbeeb7d134889066aac0a6549dcd7..084bea8f8521b48f565966ec6ee03f1e59c4d1d5 100644
 --- a/ui/accelerated_widget_mac/display_ca_layer_tree.mm
 +++ b/ui/accelerated_widget_mac/display_ca_layer_tree.mm
 @@ -12,6 +12,7 @@
@@ -2027,7 +2032,7 @@ index 862094f2f03a18b22bdfd5095731614fec6da795..8bb9f07b885919caceaf3bec2494375b
  #include "ui/base/cocoa/animation_utils.h"
  #include "ui/base/cocoa/remote_layer_api.h"
  #include "ui/gfx/geometry/dip_util.h"
-@@ -120,6 +121,7 @@ - (void)setContentsChanged;
+@@ -135,6 +136,7 @@ - (void)setContentsChanged;
  }
  
  void DisplayCALayerTree::GotCALayerFrame(uint32_t ca_context_id) {
@@ -2035,7 +2040,7 @@ index 862094f2f03a18b22bdfd5095731614fec6da795..8bb9f07b885919caceaf3bec2494375b
    // Early-out if the remote layer has not changed.
    if (remote_layer_.contextId == ca_context_id) {
      return;
-@@ -149,6 +151,9 @@ - (void)setContentsChanged;
+@@ -164,6 +166,9 @@ - (void)setContentsChanged;
      [io_surface_layer_ removeFromSuperlayer];
      io_surface_layer_ = nil;
    }
@@ -2195,7 +2200,7 @@ index 3182458838aa96d34911280ab4c6c3aa4aa22d6d..6dc85c366b7e61c8bd0302e501c3223a
 +
  #endif  // UI_BASE_COCOA_REMOTE_ACCESSIBILITY_API_H_
 diff --git a/ui/base/cocoa/remote_layer_api.h b/ui/base/cocoa/remote_layer_api.h
-index 59dc2f82214cfd883b6ebef3b0fb25af6387a9cd..912c5252d1b30d943a1552739b9eef9a8eae2d7a 100644
+index 8a11a77f1a502b601015793738ec690b74932b11..aaaf4dd5632a57f5a68424ec36e2ff6be418f6a3 100644
 --- a/ui/base/cocoa/remote_layer_api.h
 +++ b/ui/base/cocoa/remote_layer_api.h
 @@ -9,6 +9,7 @@
@@ -2214,7 +2219,7 @@ index 59dc2f82214cfd883b6ebef3b0fb25af6387a9cd..912c5252d1b30d943a1552739b9eef9a
  // The CGSConnectionID is used to create the CAContext in the process that is
  // going to share the CALayers that it is rendering to another process to
  // display.
-@@ -68,6 +70,8 @@ extern NSString* const kCAContextIgnoresHitTest;
+@@ -71,6 +73,8 @@ extern NSString* const kCAContextIgnoresHitTest;
  
  #endif  // __OBJC__
  

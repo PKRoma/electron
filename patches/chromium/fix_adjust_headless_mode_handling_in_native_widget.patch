@@ -67,10 +67,10 @@ index dea308562c23388eb6b5749d2eb3e30eb4088048..19c57be9ab6c445e6c198b8d789d6fd8
    return _headless_info.get();
  }
 diff --git a/components/remote_cocoa/app_shim/native_widget_ns_window_bridge.mm b/components/remote_cocoa/app_shim/native_widget_ns_window_bridge.mm
-index 0c9e5982875230b9aa5a3b809dfc852fc30c14cf..b600b46afbbe7aafcad631bfc5f8d1846bf32280 100644
+index 65f01861139c26ed11de01c67b52a8b8dcd1ac6b..8efa23b1c4a9fc6936fcafc5488f8a2fdce7e155 100644
 --- a/components/remote_cocoa/app_shim/native_widget_ns_window_bridge.mm
 +++ b/components/remote_cocoa/app_shim/native_widget_ns_window_bridge.mm
-@@ -559,7 +559,7 @@ NSUInteger CountBridgedWindows(NSArray* child_windows) {
+@@ -561,7 +561,7 @@ NSUInteger CountBridgedWindows(NSArray* child_windows) {
    is_translucent_window_ = params->is_translucent;
    pending_restoration_data_ = params->state_restoration_data.Clone();
  
@@ -170,7 +170,7 @@ index 5c01e07d7d605e2d5291b637f461296c859e18a5..fdba3c24ab72b44cdf94e722623b6f64
  
    if (params.opacity == views::Widget::InitParams::WindowOpacity::kInferred &&
 diff --git a/ui/views/widget/widget.h b/ui/views/widget/widget.h
-index 45f97088b254c82c8d5c043ce23942f8c81b46d8..3738a5170fba4f544a750047ee1d1a5d11e5eff3 100644
+index a3413e4ca4a7ed7d3a617f4cfbf59a8544211c8c..e3a0e0f574f823666460eb47ddce88a86fe04dd0 100644
 --- a/ui/views/widget/widget.h
 +++ b/ui/views/widget/widget.h
 @@ -324,6 +324,11 @@ class VIEWS_EXPORT Widget : public internal::NativeWidgetDelegate,
