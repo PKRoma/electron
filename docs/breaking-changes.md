@@ -14,6 +14,18 @@ This document uses the following convention to categorize breaking changes:
 
 ## Planned Breaking API Changes (43.0)
 
+### Removed: `clipboard` module is no longer available in the renderer process
+
+The `clipboard` module is no longer exposed to renderer processes. It was
+[previously deprecated](#deprecated-clipboard-api-access-from-renderer-processes)
+and is now removed in line with
+[RFC&nbsp;0019](https://github.com/electron/rfcs/blob/main/text/0019-clipboard-rearchitecture.md#removing-the-clipboard-api-from-the-renderer)
+to close the security risk of granting non-sandboxed renderers direct clipboard access.
+
+Renderers should use the [`navigator.clipboard` API](https://developer.mozilla.org/en-US/docs/Web/API/Clipboard_API) to safely work with the system clipboard. If more advanced usage is necessary, expose the necessary helpers from a
+preload script using the [`contextBridge` API](api/context-bridge.md).
+When using `contextBridge` care must be taken to ensure that the [`clipboard API` is not exposed to untrusted content](https://www.electronjs.org/docs/latest/tutorial/security#20-do-not-expose-electron-apis-to-untrusted-web-content).
+
 ### Behavior Changed: `NativeImage.toBitmap()` now normalizes color space
 
 `NativeImage.toBitmap()` (and its deprecated alias `NativeImage.getBitmap()`) now normalizes pixel data to sRGB by default. Previously, raw pixel data was returned without color space conversion, which meant pixel values from images with different embedded color profiles (e.g., Display P3 on macOS) could differ for the same visual color.
