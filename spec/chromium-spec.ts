@@ -1,5 +1,4 @@
 import { MediaAccessPermissionRequest } from 'electron';
-import { clipboard } from 'electron/common';
 import {
   BrowserWindow,
   WebContents,
@@ -7,6 +6,7 @@ import {
   session,
   ipcMain,
   app,
+  clipboard,
   protocol,
   webContents,
   dialog,
@@ -4321,12 +4321,10 @@ describe('paste execCommand', () => {
     const w: BrowserWindow = new BrowserWindow({});
     await w.loadFile(path.join(fixturesPath, 'pages', 'blank.html'));
     const text = 'Sync Clipboard Disabled by default';
-    clipboard.write({
-      text
-    });
+    await clipboard.writeText(text);
     const paste = await readClipboard(w);
     expect(paste).to.be.empty();
-    expect(clipboard.readText()).to.equal(text);
+    expect(await clipboard.readText()).to.equal(text);
   });
 
   it('does not execute with default permissions', async () => {
@@ -4338,12 +4336,10 @@ describe('paste execCommand', () => {
     });
     await w.loadFile(path.join(fixturesPath, 'pages', 'blank.html'));
     const text = 'Sync Clipboard Disabled by default permissions';
-    clipboard.write({
-      text
-    });
+    await clipboard.writeText(text);
     const paste = await readClipboard(w);
     expect(paste).to.be.empty();
-    expect(clipboard.readText()).to.equal(text);
+    expect(await clipboard.readText()).to.equal(text);
   });
 
   it('does not execute with permission denied', async () => {
@@ -4361,12 +4357,10 @@ describe('paste execCommand', () => {
       return true;
     });
     const text = 'Sync Clipboard Disabled by permission denied';
-    clipboard.write({
-      text
-    });
+    await clipboard.writeText(text);
     const paste = await readClipboard(w);
     expect(paste).to.be.empty();
-    expect(clipboard.readText()).to.equal(text);
+    expect(await clipboard.readText()).to.equal(text);
   });
 
   it('can trigger paste event when permission is granted', async () => {
@@ -4384,9 +4378,7 @@ describe('paste execCommand', () => {
       return false;
     });
     const text = 'Sync Clipboard Test';
-    clipboard.write({
-      text
-    });
+    await clipboard.writeText(text);
     const paste = await readClipboard(w);
     expect(paste).to.equal(text);
   });
@@ -4432,9 +4424,7 @@ describe('paste execCommand', () => {
     const [childWindow] = await childPromise;
     expect(childWindow.webContents.opener).to.equal(w.webContents.mainFrame);
     const text = 'Sync Clipboard Test for Child Window';
-    clipboard.write({
-      text
-    });
+    await clipboard.writeText(text);
     const paste = await readClipboard(childWindow);
     expect(paste).to.equal(text);
   });

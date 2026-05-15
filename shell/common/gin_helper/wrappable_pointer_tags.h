@@ -14,6 +14,7 @@ namespace electron {
 enum ElectronWrappablePointerTag : uint16_t {
   kElectronApp = gin::kLastPointerTag + 1,  // electron::api::App
   kElectronAutoUpdater,                     // electron::api::AutoUpdater
+  kElectronClipboardItem,                   // electron::api::ClipboardItem
   kElectronCookies,                         // electron::api::Cookies
   kElectronDataPipeHolder,                  // electron::api::DataPipeHolder
   kElectronDebugger,                        // electron::api::Debugger
