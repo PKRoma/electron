@@ -29,6 +29,10 @@ inputs:
   upload-out-gen-artifacts:
     description: 'Whether to upload the out/${dir}/gen artifacts'
     required: false
+  run-include-analysis:
+    description: 'Run analyze_includes.py and upload include-analysis.html as an artifact'
+    required: false
+    default: 'false'
 runs:
   using: "composite"
   steps:
@@ -99,6 +103,41 @@ runs:
           echo "Skipping build-stats.mjs upload because DD_API_KEY is not set"
         fi
         node electron/script/build-stats.mjs $BUILD_STATS_ARGS || true
+    - name: Generate Include Analysis ${{ inputs.step-suffix }}
+      id: include-analysis
+      # if: ${{ inputs.run-include-analysis == 'true' && inputs.target-platform == 'linux' && inputs.is-asan != 'true' }}
+      if: ${{ inputs.target-platform == 'linux' && inputs.is-asan != 'true' }}
+      shell: bash
+      run: |
+        set -o pipefail
+
+        cd src
+        REVISION=$(cd electron && git rev-parse --short HEAD)
+
+        # Build with show_includes=true to get the extra info analyze_includes.py needs
+        gn gen --args="import(\"//electron/build/args/testing.gn\") use_remoteexec=true use_siso=true show_includes=true symbol_level=0 enable_precompiled_headers=false $GN_EXTRA_ARGS" out/IncludeAnalysis
+        autoninja -C out/IncludeAnalysis -v electron > /tmp/include-build.log
+
+        python3 tools/clang/scripts/analyze_includes.py \
+          --target electron \
+          --revision "$REVISION" \
+          --root-filter '^electron/' \
+          --json-out /tmp/include-analysis.data.js \
+          --processes 24 \
+          /tmp/include-build.log
+
+        # Inline the JS into the HTML so we have a single file to upload
+        awk -v data=/tmp/include-analysis.data.js '
+          /<script src="include-analysis.js"><\/script>/ {
+            print "<script>"
+            while ((getline line < data) > 0) print line
+            print "</script>"
+            next
+          }
+          { print }
+        ' electron/.github/actions/build-electron/include-analysis.html > include-analysis.html
+
+        echo "path=./src/include-analysis.html" >> "$GITHUB_OUTPUT"
     - name: Build Electron (Windows) ${{ inputs.step-suffix }}
       if: ${{ inputs.target-platform == 'win' }}
       shell: powershell
@@ -338,4 +377,11 @@ runs:
       with:
         name: object_checksums_${{ inputs.artifact-platform }}_${{ inputs.target-arch }}
         path: ./src/object-checksums.${{ inputs.artifact-platform }}_${{ inputs.target-arch }}.json
+        archive: false
+    - name: Upload Include Analysis ${{ inputs.step-suffix }}
+      if: ${{ steps.include-analysis.outputs.path != '' }}
+      uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+      with:
+        name: include-analysis.html
+        path: ${{ steps.include-analysis.outputs.path }}
         archive: false
