@@ -1,0 +1,230 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Samuel Attard <sattard@anthropic.com>
+Date: Wed, 20 May 2026 00:10:34 +0100
+Subject: electron: build-time V8 code cache for the electron/js2c bundles
+
+
+diff --git a/src/node_builtins.cc b/src/node_builtins.cc
+index 04d76fdd3d170a7c501bd773b698d380b8bb2426..2b69d1b796ff28bd6958c08329c38ec4f2ffb52c 100644
+--- a/src/node_builtins.cc
++++ b/src/node_builtins.cc
+@@ -1,4 +1,5 @@
+ #include "node_builtins.h"
++#include "base/dcheck_is_on.h"
+ #include "debug_utils-inl.h"
+ #include "env-inl.h"
+ #include "module_wrap.h"
+@@ -13,6 +14,26 @@
+ namespace node {
+ namespace builtins {
+ 
++// Electron, test-only (DCHECK builds): per-process record of whether each
++// electron/js2c/* bundle's build-time code cache was consumed. Backs the
++// code-cache spec; compiled out in production.
++#if DCHECK_IS_ON()
++static std::map<std::string, bool>& ElectronJs2cCacheStatusMap() {
++  static auto* m = new std::map<std::string, bool>();
++  return *m;
++}
++const std::map<std::string, bool>& ElectronJs2cCacheStatus() {
++  return ElectronJs2cCacheStatusMap();
++}
++static void RecordElectronJs2cCacheStatus(const std::string& id,
++                                          bool accepted) {
++  if (id.rfind("electron/js2c/", 0) == 0)
++    ElectronJs2cCacheStatusMap()[id] = accepted;
++}
++#else
++static inline void RecordElectronJs2cCacheStatus(const std::string&, bool) {}
++#endif
++
+ using loader::HostDefinedOptions;
+ using v8::Boolean;
+ using v8::Context;
+@@ -398,6 +419,7 @@ MaybeLocal<Data> BuiltinLoader::LookupAndCompile(
+     DCHECK_EQ(this, optional_realm->env()->builtin_loader());
+     RecordResult(builtin_source->id, result, optional_realm);
+   }
++  RecordElectronJs2cCacheStatus(builtin_source->id, is_cache_accepted);
+ 
+   if (has_cache) {
+     per_process::Debug(DebugCategory::CODE_CACHE,
+@@ -471,13 +493,38 @@ MaybeLocal<Function> BuiltinLoader::LookupAndCompileFunction(
+   Local<String> filename = OneByteString(isolate, filename_s);
+   Local<String> source = builtin_source->source.ToStringChecked(isolate);
+   ScriptOrigin origin(filename, 0, 0, true);
+-  ScriptCompiler::Source script_source(source, origin);
+-  return ScriptCompiler::CompileFunction(context,
+-                                         &script_source,
+-                                         parameters->size(),
+-                                         parameters->data(),
+-                                         0,
+-                                         nullptr);
++
++  // Electron: this caller-parameterized overload previously always compiled
++  // from source. Honor a RefreshCodeCache-supplied cache so a build-time
++  // cache can be consumed; V8 falls back to a normal compile on mismatch.
++  BuiltinCodeCacheData cached_data{};
++  {
++    RwLock::ScopedLock lock(code_cache_->mutex);
++    auto it = code_cache_->map.find(builtin_source->id);
++    if (it != code_cache_->map.end())
++      cached_data = it->second;
++  }
++  const bool has_cache = cached_data.data != nullptr;
++  ScriptCompiler::CachedData* cached_data_ptr =
++      has_cache ? cached_data.AsCachedData().release() : nullptr;
++  ScriptCompiler::Source script_source(source, origin, cached_data_ptr);
++  ScriptCompiler::CompileOptions options =
++      has_cache ? ScriptCompiler::kConsumeCodeCache
++                : ScriptCompiler::kNoCompileOptions;
++
++  MaybeLocal<Function> maybe_fn =
++      ScriptCompiler::CompileFunction(context, &script_source,
++                                      parameters->size(), parameters->data(),
++                                      0, nullptr, options);
++  const bool accepted = has_cache && script_source.GetCachedData() &&
++                        !script_source.GetCachedData()->rejected;
++  if (has_cache) {
++    per_process::Debug(DebugCategory::CODE_CACHE,
++                       "Code cache of %s %s\n", builtin_source->id,
++                       accepted ? "is accepted" : "is rejected");
++  }
++  RecordElectronJs2cCacheStatus(builtin_source->id, accepted);
++  return maybe_fn;
+ }
+ 
+ MaybeLocal<Value> BuiltinLoader::CompileAndCall(Local<Context> context,
+diff --git a/src/node_builtins.h b/src/node_builtins.h
+index 05b1c5bbc38f851b11383b7e3e48c1c92f47aba1..58963d27f4d8ac0579fb8d49ec17f44ea15d2440 100644
+--- a/src/node_builtins.h
++++ b/src/node_builtins.h
+@@ -11,6 +11,8 @@
+ #include <string>
+ #include <unordered_set>
+ #include <vector>
++
++#include "base/dcheck_is_on.h"
+ #include "builtin_info.h"
+ #include "node_external_reference.h"
+ #include "node_mutex.h"
+@@ -240,6 +242,11 @@ class NODE_EXTERN_PRIVATE BuiltinLoader {
+   friend class ::PerProcessTest;
+ };
+ 
++// Electron, test-only (DCHECK builds): see node_builtins.cc.
++#if DCHECK_IS_ON()
++const std::map<std::string, bool>& ElectronJs2cCacheStatus();
++#endif
++
+ }  // namespace builtins
+ 
+ }  // namespace node
+diff --git a/unofficial.gni b/unofficial.gni
+index 1285f83662e4f252faa1730df04cafc588cd7556..216bef46ff4b649a2d10a16b531b4328c5dbdebb 100644
+--- a/unofficial.gni
++++ b/unofficial.gni
+@@ -5,6 +5,7 @@
+ import("node.gni")
+ import("$node_v8_path/gni/snapshot_toolchain.gni")
+ import("$node_v8_path/gni/v8.gni")
++import("//tools/v8_context_snapshot/v8_context_snapshot.gni")
+ 
+ # The actual configurations are put inside a template in unofficial.gni to
+ # prevent accidental edits from contributors.
+@@ -348,6 +349,95 @@ template("node_gn_build") {
+     }
+   }
+ 
++  # Electron: build-time host tool emitting V8 code caches for the
++  # electron/js2c/* framework bundles. Built in v8_snapshot_toolchain (like
++  # node_mksnapshot) so it links V8 with V8_TARGET_ARCH set to the target and
++  # reads the target's snapshot blob -- the cache it emits is keyed to the
++  # target's read-only checksum and flag hash. Cross-OS stays off.
++  if (host_os == target_os) {
++    if (current_toolchain == v8_snapshot_toolchain) {
++      executable("electron_natives_codecache") {
++        # Host build tool, not shipped Chromium code.
++        configs += [
++          ":node_internal_config",
++          "//build/config/compiler:no_chromium_code",
++        ]
++        configs -= [ "//build/config/compiler:chromium_code" ]
++        sources =
++            [ "//electron/shell/common/electron_natives_codecache_main.cc" ]
++        # node's zstd binding also needs the compression symbols.
++        deps = [
++          ":libnode",
++          "//third_party/zstd:compress",
++        ]
++      }
++    }
++
++    # One generated cache per process flavor: V8's code-cache key includes
++    # FlagList::Hash() over non-default flags, which differs per process type.
++    # The flag deltas below were captured from live processes.
++    _js2c_cc_flavors = [
++      {
++        name = "sandbox"  # sandboxed renderer (no Node env)
++        snap = v8_context_snapshot_filename
++        flags = "--enable-sharedarraybuffer-per-context"
++      },
++      {
++        name = "renderer"
++        snap = v8_context_snapshot_filename
++        flags = "--enable-sharedarraybuffer-per-context --rehash-snapshot " +
++                "--no-freeze-flags-after-init"
++      },
++      {
++        name = "browser"
++        snap = v8_context_snapshot_filename
++        flags = "--rehash-snapshot --no-freeze-flags-after-init"
++      },
++      {
++        name = "utility"
++        snap = v8_context_snapshot_filename
++        flags = "--rehash-snapshot --no-freeze-flags-after-init"
++      },
++      {
++        name = "worker"
++        snap = v8_context_snapshot_filename
++        flags = "--rehash-snapshot --no-freeze-flags-after-init"
++      },
++    ]
++
++    foreach(_f, _js2c_cc_flavors) {
++      action("run_electron_natives_codecache_" + _f.name) {
++        deps = [
++          ":electron_natives_codecache($v8_snapshot_toolchain)",
++          "//tools/v8_context_snapshot:v8_context_snapshot",
++          "$node_v8_path:run_mksnapshot_default",
++        ]
++        script = "$node_v8_path/tools/run.py"
++        sources = []
++        gen_dir = get_label_info(
++                ":electron_natives_codecache($v8_snapshot_toolchain)",
++                "root_out_dir")
++        _out = "$root_gen_dir/electron_natives_code_cache_" + _f.name + ".cc"
++        outputs = [ _out ]
++        args = [
++          "./" + rebase_path(gen_dir + "/electron_natives_codecache",
++                             root_build_dir),
++          rebase_path(_out, root_build_dir),
++          rebase_path("$root_out_dir/" + _f.snap, root_build_dir),
++          _f.name,
++          _f.flags,
++        ]
++      }
++    }
++
++    group("run_electron_natives_codecache") {
++      public_deps = []
++      foreach(_f, _js2c_cc_flavors) {
++        public_deps += [ ":run_electron_natives_codecache_" + _f.name ]
++      }
++    }
++  }
++
+   action("generate_config_gypi") {
+     deps = [ "$node_v8_path:v8_generate_features_json" ]
+     script = "tools/generate_config_gypi.py"
