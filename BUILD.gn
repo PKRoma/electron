@@ -31,6 +31,18 @@ import("filenames.hunspell.gni")
 import("filenames.libcxx.gni")
 import("filenames.libcxxabi.gni")
 
+declare_args() {
+  # Emit a build-time V8 code cache for the electron/js2c/* bundles. When
+  # false an empty stub is compiled and bundles compile from source.
+  #
+  # Cross-arch is supported: the generator is built in v8_snapshot_toolchain
+  # (V8_TARGET_ARCH set to the target) and reads the target's snapshot blob,
+  # so the cache it emits is keyed to the target's read-only checksum -- the
+  # same mechanism that makes V8's mksnapshot cross-arch correct. Cross-OS is
+  # untested and stays off.
+  electron_generate_js2c_code_cache = host_os == target_os
+}
+
 if (is_mac) {
   import("//build/config/mac/rules.gni")
   import("//third_party/icu/config.gni")
@@ -572,7 +584,8 @@ source_set("electron_lib") {
     "//v8:v8_libplatform",
   ]
 
-  if (v8_use_external_startup_data && use_v8_context_snapshot) {
+  if (v8_use_external_startup_data && use_v8_context_snapshot &&
+      current_toolchain == default_toolchain) {
     deps += [ ":mksnapshot_checksum_gen" ]
   }
 
@@ -626,6 +639,19 @@ source_set("electron_lib") {
   }
   if (!is_mac) {
     sources += filenames.lib_sources_views
+  }
+
+  if (electron_generate_js2c_code_cache) {
+    sources += [
+      "$root_gen_dir/electron_natives_code_cache_browser.cc",
+      "$root_gen_dir/electron_natives_code_cache_renderer.cc",
+      "$root_gen_dir/electron_natives_code_cache_sandbox.cc",
+      "$root_gen_dir/electron_natives_code_cache_utility.cc",
+      "$root_gen_dir/electron_natives_code_cache_worker.cc",
+    ]
+    deps += [ "//third_party/electron_node:run_electron_natives_codecache" ]
+  } else {
+    sources += [ "shell/common/node_natives_code_cache_stub.cc" ]
   }
 
   if (is_component_build) {
@@ -847,16 +873,22 @@ source_set("electron_lib") {
   }
 }
 
-action("mksnapshot_checksum_gen") {
-  script = "build/checksum_header.py"
+# tools/v8_context_snapshot writes its output to $root_build_dir regardless
+# of toolchain, so this is only well-formed in the default toolchain (where
+# $root_out_dir == $root_build_dir). It is also only needed there -- only the
+# shipped framework reads snapshot_checksum.h.
+if (current_toolchain == default_toolchain) {
+  action("mksnapshot_checksum_gen") {
+    script = "build/checksum_header.py"
 
-  outputs = [ "$target_gen_dir/snapshot_checksum.h" ]
-  inputs = [ "$root_out_dir/$v8_context_snapshot_filename" ]
-  args = rebase_path(inputs)
+    outputs = [ "$target_gen_dir/snapshot_checksum.h" ]
+    inputs = [ "$root_out_dir/$v8_context_snapshot_filename" ]
+    args = rebase_path(inputs)
 
-  args += rebase_path(outputs)
+    args += rebase_path(outputs)
 
-  deps = [ "//tools/v8_context_snapshot" ]
+    deps = [ "//tools/v8_context_snapshot" ]
+  }
 }
 
 electron_paks("packed_resources") {
